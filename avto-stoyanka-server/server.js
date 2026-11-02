@@ -112,7 +112,7 @@ app.post('/api/enter', async (req, res) => {
             ORDER BY ($2 AND is_accessible) DESC, id LIMIT 1 FOR UPDATE SKIP LOCKED)
           RETURNING *`, [premium, disabledDriver]);
     if (!spot.rows[0]) {
-      throw fail(409, spotId ? 'Bu joy band, yopiq yoki nogironlar uchun ajratilgan' : premium ? "Bo'sh premium joy qolmadi" : "Bo'sh oddiy joy qolmadi");
+      throw fail(409, spotId ? 'Bu joy band, yopiq yoki nogironlar uchun ajratilgan' : premium ? "Bo'sh VIP joy qolmadi" : "Bo'sh oddiy joy qolmadi");
     }
 
     const s = spot.rows[0];

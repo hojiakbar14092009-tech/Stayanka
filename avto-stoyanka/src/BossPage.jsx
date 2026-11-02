@@ -252,7 +252,7 @@ export default function BossPage() {
         <div className="tile"><span><Icon name="car" /> Kirgan mashinalar</span><b><Count value={t.entered} /></b></div>
         <div className="tile"><span><Icon name="exit" /> Chiqqan</span><b><Count value={t.exited} /></b></div>
         <div className="tile"><span><Icon name="pin" /> Hozir ichkarida</span><b><Count value={t.inside} /></b></div>
-        <div className="tile"><span><Icon name="crown" /> Premium ulushi</span><b><Count value={premiumShare} />%</b></div>
+        <div className="tile"><span><Icon name="crown" /> VIP ulushi</span><b><Count value={premiumShare} />%</b></div>
         <div className="tile"><span><Icon name="drop" /> O'rtacha turish</span><b><Count value={t.avg_minutes} /> <small>daq</small></b></div>
         <div className="tile"><span><Icon name="wheelchair" /> Nogironlar (bepul)</span><b><Count value={t.disabled_free} /></b></div>
         <div className="tile"><span><Icon name="warning" /> To'lanmagan qarz</span><b className="debt"><Count value={t.unpaid} format={money} /></b></div>

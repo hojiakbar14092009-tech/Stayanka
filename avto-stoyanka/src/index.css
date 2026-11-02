@@ -812,3 +812,12 @@ label { display: grid; gap: .3rem; font-size: .9rem; color: var(--paint-dim); }
 .gate.expanded { position: fixed; inset: 3vh 3vw; height: auto; z-index: 75; box-shadow: 0 0 0 100vmax rgba(10, 11, 13, .75), 0 30px 80px rgba(0, 0, 0, .6); }
 .gate.expanded .gate-caption { font-size: 1.2rem; }
 .dock:has(.gate.expanded) { z-index: 80; } /* kattalashganda reja ustida turadi */
+
+/* VIP qulayliklari jadvali (A zona) */
+.vip-perks { margin: 0 0 12px; padding: 10px 14px 12px; border-radius: 14px; background: linear-gradient(135deg, #141418, #26221a); border: 1px solid rgba(242, 194, 48, .5); color: #f4ecd8; }
+.vip-perks h3 { margin: 0 0 8px; font: 700 1rem var(--display); color: var(--yellow); display: flex; align-items: center; gap: .4rem; }
+.vip-perks table { width: 100%; border-collapse: collapse; }
+.vip-perks tbody { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 4px 16px; }
+.vip-perks tr { display: flex; align-items: center; gap: 8px; padding: 4px 0; border-bottom: 1px solid rgba(242, 194, 48, .15); }
+.vip-perks td { padding: 0; font-size: .88rem; }
+.vip-perks td:first-child { color: var(--yellow); display: grid; place-items: center; }

@@ -44,6 +44,16 @@ export function paintFor(plate = '') {
 }
 
 // Mashina markasi raqamdan doimiy tanlanadi (haqiqiy tizimda kamera/ro'yxatdan keladi).
+// VIP joy qulayliklari: qorovul panelida va 3D garajdagi tabloda bir xil ro'yxat
+export const VIP_PERKS = [
+  ["Yopiq, shamol va quyoshdan himoyalangan joy", "roof"],
+  ["Har tashrifda bepul yuvish (moykachilar)", "drop"],
+  ["Keng joy, joylar orasida shisha to'siq", "car"],
+  ["Elektromobil quvvatlash", "bolt"],
+  ["24/7 qo'riqchi va video kuzatuv", "shield"],
+  ["Mallga shisha ko'prik orqali kirish", "pin"],
+];
+
 // Premium joyga ko'pincha qimmat mashinalar qo'yiladi.
 export const LUXURY = ['Rolls-Royce', 'Bentley', 'Lamborghini', 'Ferrari', 'Porsche', 'Maybach', 'Mercedes G-Class', 'Range Rover', 'BMW M8', 'Lexus LX'];
 const COMMON = ['Chevrolet Cobalt', 'Chevrolet Gentra', 'Chevrolet Malibu', 'Chevrolet Tracker', 'Chevrolet Spark', 'Kia K5', 'Hyundai Sonata', 'BYD Song', 'Chevrolet Onix', 'Damas'];

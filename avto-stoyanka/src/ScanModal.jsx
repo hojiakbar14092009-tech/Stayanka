@@ -78,7 +78,7 @@ export default function ScanModal({ code, onClose, onExit }) {
             <h2>Chek faol</h2>
             <p className="plate lg">{ticket.plate}</p>
             <dl className="facts">
-              <dt>Joy</dt><dd>{ticket.label}{ticket.is_premium ? ' (Premium)' : ''}</dd>
+              <dt>Joy</dt><dd>{ticket.label}{ticket.is_premium ? ' (VIP)' : ''}</dd>
               <dt>Kirdi</dt><dd>{time(ticket.entered_at)}</dd>
               <dt>Turdi</dt><dd>{duration(stay)}</dd>
               <dt>To'lov</dt><dd className="price">{ticket.disabled_driver ? 'Bepul (nogironlar uchun)' : money(calcFee(stay, ticket.tariff, ticket.is_premium))}</dd>

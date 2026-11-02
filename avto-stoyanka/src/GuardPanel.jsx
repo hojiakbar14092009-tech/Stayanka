@@ -1,6 +1,6 @@
 // Qorovul paneli: tepadan ko'rilgan stoyanka rejasi + o'ng tomonda qidiruv, darvoza (kamera), skaner va amal kartasi
 import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react';
-import { api, money, time, duration, calcFee, paintFor, brandFor, washerWow, shapeFor } from './api';
+import { api, money, time, duration, calcFee, paintFor, brandFor, washerWow, shapeFor, VIP_PERKS } from './api';
 import Icon from './Icon';
 import Receipt from './Receipt';
 import Ticket from './Ticket';
@@ -273,6 +273,18 @@ function LotMap({ spots, selectedId, foundIds, onPick }) {
   );
   return (
     <div className="lot-scroll">
+      {premium && (
+        <div className="vip-perks">
+          <h3><Icon name="crown" /> VIP qulayliklari</h3>
+          <table>
+            <tbody>
+              {VIP_PERKS.map(([text, icon]) => (
+                <tr key={text}><td><Icon name={icon} /></td><td>{text}</td></tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
       <svg width="0" height="0" aria-hidden="true">
         <defs>
           <linearGradient id="car-sheen" x1="0" y1="0" x2="1" y2="0">
@@ -287,7 +299,7 @@ function LotMap({ spots, selectedId, foundIds, onPick }) {
         {row(rows[0], 'down', 'r')}
         <div className="lane"><span>⟶</span><span>⟶</span><span>⟶</span></div>
         {row(rows[1], 'up', 'r')}
-        <div className="curb">{premium && <span><Icon name="crown" /> Yopiq premium to'xtash joyi. Moykachilar xizmatda <Icon name="drop" /></span>}</div>
+        <div className="curb">{premium && <span><Icon name="crown" /> VIP to'xtash joyi. Moykachilar xizmatda <Icon name="drop" /></span>}</div>
         {row(rows[2], 'down', 'l')}
         <div className="lane"><span>⟵</span><span>⟵</span><span>⟵</span></div>
         {row(rows[3], 'up', 'l')}
@@ -467,7 +479,7 @@ export default function GuardPanel({ spots, tariff, reload, lastEvent, notify })
             return (
               <button key={z} className={`zone-tab${z === zone ? ' on' : ''}${list[0]?.is_premium ? ' premium' : ''}${hits ? ' has-hit' : ''}`} onClick={() => setZone(z)} aria-pressed={z === zone}>
                 <b>{z}</b>
-                <span>{z === 'A' ? <><Icon name="crown" size="1em" /> Premium</> : `Zona ${z}`}</span>
+                <span>{z === 'A' ? <><Icon name="crown" size="1em" /> VIP</> : `Zona ${z}`}</span>
                 <em>{hits ? `${hits} ta topildi` : `${free} bo'sh`}</em>
                 <MiniMap list={list} foundIds={foundIds} />
               </button>
@@ -476,7 +488,7 @@ export default function GuardPanel({ spots, tariff, reload, lastEvent, notify })
         </nav>
         <LotMap spots={zoneSpots} selectedId={selectedId} foundIds={foundIds} onPick={pick} />
         <p className="legend">
-          <span className="key free" /> bo'sh <span className="key busy" /> band <span className="key off" /> ta'mirda <Icon name="crown" /> premium, yopiq <AccessSign small /> nogironlar uchun, bepul
+          <span className="key free" /> bo'sh <span className="key busy" /> band <span className="key off" /> ta'mirda <Icon name="crown" /> VIP, yopiq <AccessSign small /> nogironlar uchun, bepul
         </p>
       </section>
 
@@ -531,7 +543,7 @@ export default function GuardPanel({ spots, tariff, reload, lastEvent, notify })
                 </p>
                 <div className="seg wide" role="group" aria-label="Joy turi — mijoz tanlaydi">
                   <button type="button" className={arrivePremium ? '' : 'on'} onClick={() => setArrivePremium(false)}>Oddiy joy</button>
-                  <button type="button" className={arrivePremium ? 'on gold-on' : ''} onClick={() => setArrivePremium(true)}><Icon name="crown" /> Premium</button>
+                  <button type="button" className={arrivePremium ? 'on gold-on' : ''} onClick={() => setArrivePremium(true)}><Icon name="crown" /> VIP</button>
                 </div>
                 <button type="button" className={`btn access-toggle${arriveDisabled ? ' on' : ''}`} onClick={() => setArriveDisabled((v) => !v)} aria-pressed={arriveDisabled}>
                   <AccessSign small /> Nogironlik guvohnomasi bor{arriveDisabled ? ': bepul' : ''}
@@ -599,7 +611,7 @@ export default function GuardPanel({ spots, tariff, reload, lastEvent, notify })
               {!selected && (
                 <div className="seg wide" role="group" aria-label="Joy turi — mijoz tanlaydi">
                   <button type="button" className={premium ? '' : 'on'} onClick={() => setPremium(false)}>Oddiy joy</button>
-                  <button type="button" className={premium ? 'on gold-on' : ''} onClick={() => setPremium(true)}><Icon name="crown" /> Premium, yopiq</button>
+                  <button type="button" className={premium ? 'on gold-on' : ''} onClick={() => setPremium(true)}><Icon name="crown" /> VIP</button>
                 </div>
               )}
               <button type="button" className={`btn access-toggle${disabledDriver ? ' on' : ''}`} onClick={() => setDisabledDriver((v) => !v)} aria-pressed={disabledDriver}>

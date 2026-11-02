@@ -38,7 +38,7 @@ export default function Ticket({ ticket: t, onClose, closeLabel = 'Yopish' }) {
             <div className="t-spot">
               <small>Joyingiz</small>
               <b>{t.label}</b>
-              {t.is_premium && <em>Premium, yopiq</em>}
+              {t.is_premium && <em>VIP, yopiq</em>}
             </div>
             <p className="r-plate">{t.plate}</p>
             <QR code={t.ticket_no} />

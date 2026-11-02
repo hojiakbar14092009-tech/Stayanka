@@ -224,10 +224,15 @@ Sinov uchun 30 kunlik tarix: `npm run demo` (server papkasida).
 
 ## 15. 3 qavatli garaj — 200 joy (3D)
 
-- Ochiq maydon o'rniga 3 qavatli garaj: 1-qavat — A (premium) va B, 2-qavat — C va D, 3-qavat (ochiq tom) — E. Har zona 2D rejadagidek 10 × 4 joy, raqamlar polga chizilgan (`A-01` …).
+- Ochiq maydon o'rniga 3 qavatli garaj: 1-qavat — A (VIP) va B, 2-qavat — C va D, 3-qavat (ochiq tom) — E. Har zona 2D rejadagidek 10 × 4 joy, raqamlar polga chizilgan (`A-01` …).
 - 3D garaj serverdagi bandlik bilan bir xil: band joyda mashina turadi, bo'shda yo'q. Har joy ustida chiroq: yashil — bo'sh, qizil — band, ko'k — nogironlar uchun. Kirishdagi LED tablo har qavatdagi bo'sh joylarni ko'rsatadi.
-- Mashinalar paydo bo'lmaydi: shlagbaumdan garajga kirib, kerak bo'lsa spiral rampa bo'ylab o'z qavatiga ko'tariladi va aynan o'z joyiga kiradi; chiqishda joyidan orqaga chiqib, rampadan tushib shlagbaumga keladi. Shlagbaum yopilgach darvoza keyingi mashinani qabul qiladi.
+- Mashinalar paydo bo'lmaydi: shlagbaumdan garajga kirib, ikki spiral rampa bor: sharqiysi (ko'k, «P ↑ KIRISH») orqali o'z qavatiga ko'tariladi va aynan o'z joyiga kiradi; chiqishda joyidan orqaga chiqib, g'arbiy rampa (yashil, «↓ CHIQISH») orqali tushadi — u chiqish yo'liga eng yaqin. Shlagbaum yopilgach darvoza keyingi mashinani qabul qiladi.
 - "Kesim": mashina pastki qavatda yursa, ustidagi qavatlar shaffof bo'lib ichkari ko'rinadi.
 - Zona tugmasi bosilsa, kamera o'sha zonaga boradi, qavat ochiladi va zona oltin ramka hamda "Zona C · 2-qavat" yozuvi bilan belgilanadi (7 soniya).
-- Premium A: yaltiroq qora pol, joylar orasida shisha devorchalar, oltin ship yoritgichi, "PREMIUM" peshtoqi, oltin ustunlar va mashinani yuvayotgan moykachilar.
-- Savdo markazi 1,7 barobar kattalashtirildi, garaj ortida; garaj tomidan unga shisha piyodalar ko'prigi o'tadi.
+- VIP A (avvalgi «Premium»): yaltiroq qora pol, joylar orasida shisha devorchalar, oltin ship yoritgichi, "PREMIUM" peshtoqi, oltin ustunlar, elektromobil quvvatlagichlari va mashinani yuvayotgan moykachilar. Kirishda «VIP qulayliklari» tablosi turadi; xuddi shu ro'yxat (`VIP_PERKS`, `api.js`) qorovul panelida A zona ochilganda jadval bo'lib chiqadi.
+- Savdo markazi 1,7 barobar katta va garajning o'ng yonida, yo'lga qaragan: g'arbiy devori garaj rampasiga tegib turadi, garaj tomidan unga qisqa shisha ko'prik o'tadi.
+
+## 16. Tashkent City Park (3D)
+
+- Savdo markazining ro'parasida, yo'lning narigi tomonida: kirish arkasi, xiyobonlar, 16 kabinali charxpalak (LED gardish rangi o'zgarib turadi), karusel, amerikan tepaligi (vagonchalar yuguradi), tushish minorasi va raqsga tushadigan favvora.
+- Darvozada voqea bo'lmasa, kamera 12 soniyadan keyin sekin aylana boshlaydi: darvoza → garaj va mall → park → qaytish. Mashina kelsa yoki zona tanlansa, darhol darvozaga/zonaga qaytadi. «Harakatni kamaytirish» yoqilgan bo'lsa aylanmaydi.

@@ -28,7 +28,7 @@ export default function Receipt({ receipt: r, onClose }) {
             <p className="r-no">{r.receipt_no}</p>
             <p className="r-plate">{r.plate}</p>
             <dl>
-              <dt>Joy</dt><dd>{r.label}{r.is_premium ? ' (Premium)' : ''}</dd>
+              <dt>Joy</dt><dd>{r.label}{r.is_premium ? ' (VIP)' : ''}</dd>
               <dt>Kirdi</dt><dd>{dateTime(r.entered_at)}</dd>
               <dt>Chiqdi</dt><dd>{dateTime(r.left_at)}</dd>
               <dt>Turdi</dt><dd>{duration(ms)}</dd>

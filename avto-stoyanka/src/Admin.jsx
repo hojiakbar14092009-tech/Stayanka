@@ -138,7 +138,7 @@ export function SpotsAdmin({ spots, reload }) {
         </div>
         <div className="seg" role="group" aria-label="Nimani o'zgartirish">
           <button className={mode === 'is_disabled' ? 'on' : ''} onClick={() => setMode('is_disabled')}>Ta'mirga yopish</button>
-          <button className={mode === 'is_premium' ? 'on' : ''} onClick={() => setMode('is_premium')}>Premium qilish</button>
+          <button className={mode === 'is_premium' ? 'on' : ''} onClick={() => setMode('is_premium')}>VIP qilish</button>
           <button className={mode === 'is_accessible' ? 'on' : ''} onClick={() => setMode('is_accessible')}>♿ Nogironlar joyi</button>
         </div>
       </div>
@@ -184,14 +184,14 @@ export function TariffAdmin({ tariff, reload }) {
         <h2>Tarif</h2>
         <label>1-soat narxi, so'm<input className="input" type="number" min="0" step="500" value={form.base_hour} onChange={set('base_hour')} /></label>
         <label>Har keyingi soatga qo'shiladi, so'm<input className="input" type="number" min="0" step="500" value={form.step_hour} onChange={set('step_hour')} /></label>
-        <label>Premium joy, 1-soat narxi, so'm<input className="input" type="number" min="0" step="1000" value={form.premium_hour} onChange={set('premium_hour')} /></label>
+        <label>VIP joy, 1-soat narxi, so'm<input className="input" type="number" min="0" step="1000" value={form.premium_hour} onChange={set('premium_hour')} /></label>
         <button className="btn primary">Tarifni saqlash</button>
         {msg && <p className="muted" role="status">{msg}</p>}
       </form>
       <section className="card">
         <h2>Qancha to'laydi</h2>
         <table className="table">
-          <thead><tr><th>Turdi</th><th className="num">Oddiy</th><th className="num">Premium</th></tr></thead>
+          <thead><tr><th>Turdi</th><th className="num">Oddiy</th><th className="num">VIP</th></tr></thead>
           <tbody>
             {[1, 2, 3, 4, 6, 8, 12, 24].map((h) => (
               <tr key={h}>
