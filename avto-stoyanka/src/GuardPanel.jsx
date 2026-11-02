@@ -1,6 +1,6 @@
 // Qorovul paneli: tepadan ko'rilgan stoyanka rejasi + o'ng tomonda qidiruv, darvoza (kamera), skaner va amal kartasi
 import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react';
-import { api, money, time, duration, calcFee, paintFor, brandFor, isLuxury, shapeFor } from './api';
+import { api, money, time, duration, calcFee, paintFor, brandFor, washerWow, shapeFor } from './api';
 import Icon from './Icon';
 import Receipt from './Receipt';
 import Ticket from './Ticket';
@@ -70,7 +70,7 @@ function Stall({ spot, face, lane, selected, found, onPick }) {
       aria-label={`${spot.label}, ${title}`}
       aria-pressed={selected}
     >
-      <span className="stall-no">{spot.label.slice(2)}</span>
+      <span className={`stall-tag ${state}${spot.is_accessible ? " acc" : ""}`} aria-hidden="true"><i />{spot.label.slice(2)}</span>
       {spot.is_accessible && !spot.is_busy && <AccessSign />}
       {spot.is_busy && spot.disabled_driver && <span className="isa-badge" title="Nogironlar uchun bepul"><AccessSign small /></span>}
       {spot.is_busy && <Car key={spot.session_id} plate={spot.plate} premium={spot.is_premium} />}
@@ -209,7 +209,7 @@ function Washer({ lot, dirtyIds, crew, index, claims, plates }) {
         if (!st.greeted) {
           st.greeted = true;
           const brand = brandFor(platesRef.current[st.target] || '', true);
-          if (isLuxury(brand)) {
+          if (washerWow(brand)) {
             say.current.querySelector('b').textContent = `Vuy j....b, ${brand}-mi?!`;
             st.sayUntil = t + 3.6;
           }

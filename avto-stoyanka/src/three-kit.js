@@ -40,56 +40,87 @@ export function drawPlate(ctx, plate) {
   ctx.fillText(plate.slice(2), (w + 124) / 2, h / 2 + 4);
 }
 
-// ---------- Mashina: yon profil siqib chiqariladi (extrude), g'ildiraklar aylanadi ----------
-export function buildCar() {
+// ---------- Mashina: kuzov turi (sedan / suv / sport), lakli bo'yoq, xrom, g'ildirak arkalari ----------
+// Profil — yon ko'rinish nuqtalari (x: uzunlik, y: balandlik); spline bilan silliq siqib chiqariladi
+const CAR_TYPES = {
+  sedan: {
+    lower: [[-1.13, 0.26], [1.1, 0.26], [1.19, 0.4], [1.15, 0.56], [0.6, 0.65], [-0.2, 0.67], [-0.96, 0.67], [-1.14, 0.52]],
+    cabin: [[0.58, 0.64], [0.32, 0.86], [0.1, 0.97], [-0.5, 0.97], [-0.8, 0.86], [-0.95, 0.65]],
+    width: 0.96, wheelR: 0.25, wheelX: 0.72, plateY: 0.36, headY: 0.5, tailY: 0.56,
+  },
+  suv: {
+    lower: [[-1.16, 0.32], [1.12, 0.32], [1.22, 0.48], [1.2, 0.74], [0.75, 0.82], [-0.3, 0.84], [-1.1, 0.84], [-1.18, 0.62]],
+    cabin: [[0.72, 0.81], [0.5, 1.08], [0.35, 1.18], [-1.0, 1.19], [-1.08, 1.05], [-1.1, 0.83]],
+    width: 1.04, wheelR: 0.3, wheelX: 0.74, plateY: 0.44, headY: 0.68, tailY: 0.72,
+  },
+  sport: {
+    lower: [[-1.16, 0.22], [1.15, 0.22], [1.24, 0.3], [1.18, 0.42], [0.45, 0.53], [-0.4, 0.58], [-0.98, 0.58], [-1.18, 0.46]],
+    cabin: [[0.38, 0.54], [0.15, 0.72], [-0.1, 0.8], [-0.5, 0.8], [-0.78, 0.68], [-0.95, 0.57]],
+    width: 1.02, wheelR: 0.24, wheelX: 0.74, plateY: 0.31, headY: 0.42, tailY: 0.5,
+  },
+};
+
+function profileShape(points) {
+  const s = new THREE.Shape();
+  s.moveTo(...points[0]);
+  s.lineTo(...points[1]);
+  s.splineThru(points.slice(2).map(([x, y]) => new THREE.Vector2(x, y)));
+  s.closePath();
+  return s;
+}
+
+export function buildCar(type = 'sedan') {
+  const T = CAR_TYPES[type] || CAR_TYPES.sedan;
+  const half = T.width / 2;
   const car = new THREE.Group();
   const body = new THREE.Group(); // osma: burun egilishi shu guruhda
   car.add(body);
-  const paint = mat(0xffffff, { roughness: 0.28, metalness: 0.55 });
-  const glass = mat(0x18202b, { roughness: 0.08, metalness: 0.7 });
+  const paint = new THREE.MeshPhysicalMaterial({ color: 0xffffff, metalness: 0.55, roughness: 0.32, clearcoat: 1, clearcoatRoughness: 0.06 });
+  const glass = new THREE.MeshPhysicalMaterial({ color: 0x0d141c, metalness: 0.2, roughness: 0.04, clearcoat: 1, transparent: true, opacity: 0.92 });
+  const chrome = mat(0xd9dde3, { metalness: 1, roughness: 0.12 });
+  const black = mat(0x111214, { roughness: 0.6 });
 
-  const lower = new THREE.Shape();
-  lower.moveTo(-1.12, 0.24);
-  lower.lineTo(1.08, 0.24);
-  lower.quadraticCurveTo(1.18, 0.26, 1.17, 0.42);
-  lower.lineTo(1.12, 0.56);
-  lower.quadraticCurveTo(0.9, 0.64, 0.55, 0.64);
-  lower.lineTo(-0.95, 0.66);
-  lower.quadraticCurveTo(-1.12, 0.64, -1.13, 0.5);
-  lower.closePath();
-  const lowerGeo = new THREE.ExtrudeGeometry(lower, { depth: 0.96, bevelEnabled: true, bevelSize: 0.04, bevelThickness: 0.05, bevelSegments: 3 });
-  lowerGeo.translate(0, 0, -0.48);
+  const lowerGeo = new THREE.ExtrudeGeometry(profileShape(T.lower), { depth: T.width - 0.08, bevelEnabled: true, bevelSize: 0.04, bevelThickness: 0.06, bevelSegments: 4, curveSegments: 18 });
+  lowerGeo.translate(0, 0, -(T.width - 0.08) / 2);
   body.add(mesh(lowerGeo, paint));
-
-  const cabin = new THREE.Shape();
-  cabin.moveTo(0.56, 0.63);
-  cabin.quadraticCurveTo(0.3, 0.9, 0.12, 0.97);
-  cabin.lineTo(-0.5, 0.97);
-  cabin.quadraticCurveTo(-0.78, 0.9, -0.93, 0.64);
-  cabin.closePath();
-  const cabinGeo = new THREE.ExtrudeGeometry(cabin, { depth: 0.84, bevelEnabled: true, bevelSize: 0.03, bevelThickness: 0.03, bevelSegments: 2 });
-  cabinGeo.translate(0, 0, -0.42);
+  const cabinGeo = new THREE.ExtrudeGeometry(profileShape(T.cabin), { depth: T.width - 0.2, bevelEnabled: true, bevelSize: 0.03, bevelThickness: 0.04, bevelSegments: 3, curveSegments: 14 });
+  cabinGeo.translate(0, 0, -(T.width - 0.2) / 2);
   body.add(mesh(cabinGeo, glass));
-  body.add(box(0.64, 0.04, 0.86, paint, { x: -0.19, y: 0.99 })); // tom
-  body.add(box(0.06, 0.32, 0.88, paint, { x: -0.16, y: 0.82 })); // B-ustun
-
-  const head = mat(0xfff3c4, { emissive: 0xfff3c4, emissiveIntensity: 1.4 });
-  const tail = mat(0x8a1c20, { emissive: 0xe5484d, emissiveIntensity: 0.4 });
-  for (const z of [0.33, -0.33]) {
-    body.add(box(0.03, 0.09, 0.22, head, { x: 1.225, y: 0.48, z, shadow: false }));
-    body.add(box(0.03, 0.09, 0.24, tail, { x: -1.185, y: 0.55, z, shadow: false }));
+  // Tom va ustunlar — bo'yoq rangida (oyna faqat derazalarda ko'rinadi)
+  const roofTop = Math.max(...T.cabin.map((p) => p[1]));
+  const roofXs = T.cabin.filter((p) => p[1] > roofTop - 0.02).map((p) => p[0]);
+  const roofW = Math.max(...roofXs) - Math.min(...roofXs) + 0.1;
+  body.add(box(roofW, 0.035, T.width - 0.16, paint, { x: (Math.max(...roofXs) + Math.min(...roofXs)) / 2, y: roofTop + 0.025 }));
+  for (const px of [T.cabin[0][0] - 0.06, (T.cabin[0][0] + T.cabin.at(-1)[0]) / 2, T.cabin.at(-1)[0] + 0.05]) {
+    body.add(box(0.05, roofTop - T.cabin[0][1], T.width - 0.15, paint, { x: px, y: (roofTop + T.cabin[0][1]) / 2 }));
   }
-  for (const z of [0.55, -0.55]) {
-    const mirror = box(0.1, 0.07, 0.1, paint, { x: 0.45, y: 0.68, z });
-    mirror.add(box(0.02, 0.05, 0.07, glass, { x: -0.05 }));
+  // Xrom bel chizig'i, eshik chiziqlari, tutqichlar
+  const belt = T.cabin[0][1] - 0.01;
+  for (const z of [half + 0.035, -half - 0.035]) {
+    body.add(box(Math.abs(T.cabin[0][0] - T.cabin.at(-1)[0]), 0.012, 0.01, chrome, { x: (T.cabin[0][0] + T.cabin.at(-1)[0]) / 2, y: belt, z, shadow: false }));
+    body.add(box(0.005, belt - T.lower[0][1] - 0.08, 0.005, black, { x: -0.12, y: (belt + T.lower[0][1]) / 2, z, shadow: false }));
+    for (const hx of [0.18, -0.45]) body.add(box(0.09, 0.02, 0.012, chrome, { x: hx, y: belt - 0.08, z, shadow: false }));
+    // yon oyna
+    const mirror = box(0.12, 0.07, 0.1, paint, { x: T.cabin[0][0] - 0.1, y: belt + 0.04, z: z + Math.sign(z) * 0.04 });
+    mirror.add(box(0.02, 0.05, 0.07, glass, { x: -0.06 }));
     body.add(mirror);
-    body.add(box(0.6, 0.012, 0.005, mat(0x111111), { x: -0.05, y: 0.46, z: z * 0.9, shadow: false })); // eshik chizig'i
-    body.add(box(0.005, 0.3, 0.005, mat(0x111111), { x: -0.16, y: 0.47, z: z * 0.9, shadow: false }));
   }
-  body.add(box(0.03, 0.08, 0.5, mat(0x15171a, { metalness: 0.6, roughness: 0.3 }), { x: 1.228, y: 0.46, shadow: false })); // panjara
-  body.add(box(0.03, 0.04, 0.96, mat(0x2a2c30), { x: 1.232, y: 0.255, shadow: false })); // bamper
+  // Old: panjara, faralar (xrom hoshiya), kunduzgi chiroq; orqa: stop-chiroqlar
+  const front = Math.max(...T.lower.map((p) => p[0])) + 0.04;
+  const rear = Math.min(...T.lower.map((p) => p[0])) - 0.04;
+  body.add(box(0.03, 0.1, T.width * 0.5, black, { x: front + 0.005, y: T.headY - 0.03, shadow: false }));
+  for (let i = 0; i < 3; i++) body.add(box(0.032, 0.008, T.width * 0.48, chrome, { x: front + 0.008, y: T.headY - 0.065 + i * 0.03, shadow: false }));
+  const head = mat(0xfff3c4, { emissive: 0xfff3c4, emissiveIntensity: 1.6, roughness: 0.1 });
+  const tail = mat(0x8a1c20, { emissive: 0xe5484d, emissiveIntensity: 0.4 });
+  for (const z of [half - 0.17, -half + 0.17]) {
+    body.add(box(0.03, 0.08, 0.22, chrome, { x: front - 0.005, y: T.headY, z, shadow: false }));
+    body.add(box(0.032, 0.06, 0.19, head, { x: front + 0.002, y: T.headY, z, shadow: false }));
+    body.add(box(0.03, 0.08, 0.26, tail, { x: rear + 0.01, y: T.tailY, z, shadow: false }));
+  }
+  body.add(box(0.035, 0.05, T.width - 0.02, mat(0x202226), { x: front + 0.01, y: T.lower[0][1] + 0.02, shadow: false })); // bamper
+  body.add(box(0.035, 0.05, T.width - 0.02, mat(0x202226), { x: rear - 0.005, y: T.lower[0][1] + 0.03, shadow: false }));
 
-  // Old va orqa raqam — bitta tekstura
+  // Raqam: kuzov sirtidan oldinda (bevel ichida qolib ketmasin), o'z yorug'ligi bilan
   const canvas = document.createElement('canvas');
   canvas.width = 512;
   canvas.height = 112;
@@ -97,24 +128,34 @@ export function buildCar() {
   plateTex.colorSpace = THREE.SRGBColorSpace;
   plateTex.anisotropy = 4;
   const plateMat = new THREE.MeshStandardMaterial({ map: plateTex, emissiveMap: plateTex, emissive: 0xffffff, emissiveIntensity: 0.35, roughness: 0.4 });
-  // Raqam kuzov sirtidan 1,5 sm oldinda — bevel ichida qolib ketmasin
-  const front = mesh(new THREE.PlaneGeometry(0.42, 0.092), plateMat, { x: 1.24, y: 0.34, shadow: false });
-  front.rotation.y = Math.PI / 2;
-  const back = mesh(new THREE.PlaneGeometry(0.42, 0.092), plateMat, { x: -1.19, y: 0.38, shadow: false });
-  back.rotation.y = -Math.PI / 2;
-  body.add(front, back);
+  const fp = mesh(new THREE.PlaneGeometry(0.42, 0.092), plateMat, { x: front + 0.04, y: T.plateY, shadow: false });
+  fp.rotation.y = Math.PI / 2;
+  const bp = mesh(new THREE.PlaneGeometry(0.42, 0.092), plateMat, { x: rear - 0.03, y: T.plateY + 0.04, shadow: false });
+  bp.rotation.y = -Math.PI / 2;
+  body.add(fp, bp);
 
+  // G'ildiraklar: shina, disk, bolt halqasi; ustida qora arka
   const wheels = [];
-  const tire = mat(0x141414, { roughness: 0.9 });
-  const rim = mat(0xb9bcc2, { roughness: 0.3, metalness: 0.8 });
-  for (const [x, z] of [[0.72, 0.47], [-0.72, 0.47], [0.72, -0.47], [-0.72, -0.47]]) {
+  const tire = mat(0x141414, { roughness: 0.95 });
+  const rim = mat(0xc9ccd1, { roughness: 0.2, metalness: 0.95 });
+  const r = T.wheelR;
+  for (const [x, z] of [[T.wheelX, half], [-T.wheelX, half], [T.wheelX, -half], [-T.wheelX, -half]]) {
+    const arch = mesh(new THREE.CylinderGeometry(r + 0.05, r + 0.05, 0.06, 24, 1, false, -Math.PI / 2, Math.PI), black, { x, y: r + 0.01, z: z + Math.sign(z) * 0.005, shadow: false });
+    arch.rotation.x = Math.PI / 2;
+    body.add(arch);
     const w = new THREE.Group();
-    w.position.set(x, 0.24, z);
-    const t = mesh(new THREE.CylinderGeometry(0.24, 0.24, 0.2, 24), tire);
-    t.rotation.x = Math.PI / 2;
-    const r = mesh(new THREE.CylinderGeometry(0.14, 0.14, 0.21, 6), rim, { shadow: false });
-    r.rotation.x = Math.PI / 2;
-    w.add(t, r);
+    w.position.set(x, r, z - Math.sign(z) * 0.02);
+    const t = mesh(new THREE.TorusGeometry(r - 0.06, 0.07, 10, 28), tire);
+    const d = mesh(new THREE.CylinderGeometry(r - 0.07, r - 0.07, 0.16, 20), rim, { shadow: false });
+    d.rotation.x = Math.PI / 2;
+    const hub = mesh(new THREE.CylinderGeometry(0.05, 0.05, 0.17, 10), black, { shadow: false });
+    hub.rotation.x = Math.PI / 2;
+    for (let i = 0; i < 5; i++) {
+      const spoke = box(0.03, (r - 0.08) * 1.8, 0.02, rim, { z: Math.sign(z) * 0.075, shadow: false });
+      spoke.rotation.z = (i / 5) * Math.PI;
+      w.add(spoke);
+    }
+    w.add(t, d, hub);
     car.add(w);
     wheels.push(w);
   }
@@ -122,7 +163,7 @@ export function buildCar() {
     drawPlate(canvas.getContext('2d'), plate);
     plateTex.needsUpdate = true;
   };
-  car.userData = { body, paint, tail, wheels, setPlate, v: 0, a: 0, lastX: null };
+  car.userData = { body, paint, tail, wheels, setPlate, type, front, plateY: T.plateY, wheelR: r, v: 0, a: 0, lastX: null };
   return car;
 }
 
@@ -344,7 +385,7 @@ export function driveCar(car, x, z, dt) {
   u.lastX = x;
   car.position.set(x, 0, z);
   const dir = Math.cos(car.rotation.y); // +1 o'ngga, -1 chapga
-  for (const w of u.wheels) w.rotation.z -= (dx * dir) / 0.24;
+  for (const w of u.wheels) w.rotation.z -= (dx * dir) / u.wheelR;
   // tormozda burun pastga, tezlanishda orqaga cho'kadi
   u.body.rotation.z = lerp(u.body.rotation.z, THREE.MathUtils.clamp(u.a * dir * -0.006, -0.05, 0.05), Math.min(1, dt * 8));
   u.body.position.y = Math.sin(performance.now() / 90) * 0.004 * Math.min(1, Math.abs(v) / 3); // yo'l titrashi

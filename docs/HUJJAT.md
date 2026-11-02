@@ -194,3 +194,17 @@ Sinov uchun 30 kunlik tarix: `npm run demo` (server papkasida).
   (konfetti); xatoda mashina orqaga qaytadi, personaj bosh chayqaydi.
 - **Vercel** — `avto-stoyanka/vercel.json` barcha yo'llarni `index.html` ga yo'naltiradi (`/boshliq` ham ochiladi).
   Server manzili: build paytida `VITE_API=https://<server>/api` muhit o'zgaruvchisi.
+
+## 13. Realistik 3D va joy raqami tablosi
+
+- **Atrof:** kechki osmon, atrof-muhit aksi (lak va oynalar yaltiraydi), teksturali asfalt, trotuar plitkasi, maysa;
+  daraxtlar qatori va butalar, ko'cha chiroqlari, uzoqda binolar, shlagbaumdan keyin to'xtab turgan mashinalar.
+  Budka — g'isht devor, eshik, konditsioner, kuzatuv kamerasi, tarnov.
+- **Mashinalar:** markaga qarab kuzov — sedan, SUV, sport; lakli bo'yoq, xrom bel chizig'i va tutqichlar, panjara,
+  faralar, g'ildirak arkalari, disklar.
+- **Kamera:** asosiy ko'rinish kirish tomondan — kelayotgan mashina, shlagbaum va budka bir kadrda.
+  Raqam kamerasi mashinani oldidan kuzatib boradi — raqam doim kadrda (to'siq yoki burchak xalaqit bermaydi).
+- **Moykachilar:** Cobalt va boshqa qimmat mashinalarni ko'rganda har doim hayron qoladi; Rolls-Royce va Lamborghini'da
+  har safar emas (taxminan 4 tadan 1 tasida). Premium joyga ba'zan Cobalt ham keladi.
+- **Joy raqami:** har joyning orqa chizig'ida «aqlli stoyanka» LED tablosi — raqam va chiroq (yashil bo'sh, qizil band,
+  sariq ta'mirda, ko'k nogironlar uchun). Mashina turganda ham raqam ko'rinadi.

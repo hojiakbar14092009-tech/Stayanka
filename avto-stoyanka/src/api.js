@@ -50,10 +50,18 @@ const COMMON = ['Chevrolet Cobalt', 'Chevrolet Gentra', 'Chevrolet Malibu', 'Che
 export function brandFor(plate = '', premium = false) {
   let h = 7;
   for (const c of plate) h = (h * 33 + c.charCodeAt(0)) >>> 0;
-  const list = premium ? LUXURY : COMMON;
+  const list = premium ? PREMIUM_POOL : COMMON;
   return list[h % list.length];
 }
 export const isLuxury = (brand) => LUXURY.includes(brand);
+// Premium joyga ham ba'zan oddiy Cobalt keladi — moykachilarning eng sevimli hazili
+const PREMIUM_POOL = [...LUXURY, 'Chevrolet Cobalt', 'Chevrolet Cobalt'];
+// Moykachi hayron qoladimi: Cobalt va qimmat mashinalarda — har doim; Rolls-Royce va Lamborghini'da — har safar emas (taxminan 4 tadan 1 tasida)
+export function washerWow(brand, roll = Math.random()) {
+  if (/Cobalt/.test(brand)) return true;
+  if (/Rolls-Royce|Lamborghini/.test(brand)) return roll < 0.25;
+  return isLuxury(brand);
+}
 // Tepadan ko'rinish shakli: sport (past, uzun burun), suv (keng, to'rtburchak), sedan
 export function shapeFor(brand) {
   if (/Lamborghini|Ferrari|Porsche|BMW M8/.test(brand)) return 'sport';

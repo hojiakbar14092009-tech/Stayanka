@@ -355,10 +355,10 @@ label { display: grid; gap: .3rem; font-size: .9rem; color: var(--paint-dim); }
 
 /* Topilgan mashina ustida ko'rsatkich */
 .pin {
-  position: absolute; top: -20px; left: 50%; translate: -50% 0; z-index: 3; color: var(--yellow);
+  position: absolute; top: -36px; left: 50%; translate: -50% 0; z-index: 5; color: var(--yellow);
   font-size: 1.4rem; text-shadow: 0 2px 4px rgba(0, 0, 0, .6); animation: pin .7s ease-in-out infinite alternate;
 }
-.stall.up .pin { top: auto; bottom: -20px; rotate: 180deg; }
+.stall.up .pin { top: auto; bottom: -36px; rotate: 180deg; }
 @keyframes pin { to { transform: translateY(-6px); } }
 
 /* Qidiruv natijalari va skaner maydoni */
@@ -784,3 +784,21 @@ label { display: grid; gap: .3rem; font-size: .9rem; color: var(--paint-dim); }
 @media (prefers-reduced-motion: reduce) {
   .lot-plane, .bd-car, .bd-lights, .login-card.lux::before { animation: none !important; }
 }
+
+/* ---------- Joy raqami tablosi: orqa chiziqda, mashina ustida ham ko'rinadi (aqlli stoyanka LED) ---------- */
+.stall-no { display: none; }
+.stall-tag {
+  position: absolute; z-index: 4; left: 50%; translate: -50% 0; display: inline-flex; align-items: center; gap: 4px;
+  padding: 1px 7px 1px 5px; border-radius: 4px; background: #15171a; border: 1px solid #3a3e44;
+  font: 800 .95rem/1.15 var(--display); color: #fff; letter-spacing: .03em; box-shadow: 0 2px 4px rgba(0, 0, 0, .5);
+}
+.stall.down .stall-tag { top: -9px; }
+.stall.up .stall-tag { bottom: -9px; }
+.stall-tag i { width: 7px; height: 7px; border-radius: 50%; background: #2fb679; box-shadow: 0 0 6px #2fb679; }
+.stall-tag.busy i { background: #e5484d; box-shadow: 0 0 6px #e5484d; }
+.stall-tag.off i { background: #f2c230; box-shadow: 0 0 6px #f2c230; }
+.stall-tag.acc.free i { background: #3b7bff; box-shadow: 0 0 6px #3b7bff; }
+.stall.premium .stall-tag { border-color: rgba(242, 194, 48, .7); color: #fff3c2; }
+.stall.selected .stall-tag, .stall.found .stall-tag { background: #f2c230; color: #15171a; }
+.stall .car { margin-top: 6px; }
+.stall.up .car { margin-top: 0; margin-bottom: 6px; }
