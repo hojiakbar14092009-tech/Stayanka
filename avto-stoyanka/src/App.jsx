@@ -4,34 +4,8 @@ import { api, API, getToken, money } from './api';
 import GuardPanel from './GuardPanel';
 import Archive from './Archive';
 import { Overview, SpotsAdmin, TariffAdmin, UsersAdmin } from './Admin';
-
-function Login({ onLogin }) {
-  const [form, setForm] = useState({ username: '', password: '' });
-  const [error, setError] = useState('');
-  async function submit(e) {
-    e.preventDefault();
-    try {
-      const { token, user } = await api('/login', { method: 'POST', body: form });
-      localStorage.setItem('token', token);
-      onLogin(user);
-    } catch (err) {
-      setError(err.message);
-    }
-  }
-  return (
-    <main className="login">
-      <form className="login-card" onSubmit={submit}>
-        <div className="p-sign" aria-hidden="true">P</div>
-        <h1>AvtoStoyanka</h1>
-        <p className="muted">Smenaga kiring</p>
-        <label>Login<input className="input" autoFocus value={form.username} onChange={(e) => setForm({ ...form, username: e.target.value })} autoComplete="username" /></label>
-        <label>Parol<input className="input" type="password" value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} autoComplete="current-password" /></label>
-        <button className="btn primary big">Kirish</button>
-        {error && <p className="error" role="alert">{error}</p>}
-      </form>
-    </main>
-  );
-}
+import Boot from './Boot';
+import Login from './Login';
 
 const TABS = {
   admin: [['overview', 'Umumiy'], ['lot', 'Stoyanka'], ['archive', 'Cheklar'], ['spots', 'Joylar'], ['tariff', 'Tarif'], ['users', 'Qorovullar']],
@@ -40,7 +14,7 @@ const TABS = {
 
 export default function App() {
   const [user, setUser] = useState(null);
-  const [checking, setChecking] = useState(!!getToken());
+  const [boot, setBoot] = useState(null); // yuklanish natijasi: { online, user }
   const [tab, setTab] = useState('lot');
   const [spots, setSpots] = useState([]);
   const [revenue, setRevenue] = useState({ total: 0, count: 0 });
@@ -67,10 +41,10 @@ export default function App() {
     setTariff(t);
   }, []);
 
-  // Saqlangan token bilan avtomatik kirish
-  useEffect(() => {
-    if (!getToken()) return;
-    api('/me').then(signIn, () => {}).finally(() => setChecking(false));
+  // Yuklanish tugadi: saqlangan sessiya bo'lsa — to'g'ridan-to'g'ri panelga
+  const ready = useCallback((ctx) => {
+    setBoot(ctx);
+    if (ctx.user) signIn(ctx.user);
   }, []);
 
   useEffect(() => {
@@ -103,8 +77,8 @@ export default function App() {
     return () => es.close();
   }, [user, reload, notify]);
 
-  if (checking) return null;
-  if (!user) return <Login onLogin={signIn} />;
+  if (!boot) return <Boot onReady={ready} />;
+  if (!user) return <Login onLogin={signIn} online={boot.online} />;
 
   const free = spots.filter((s) => !s.is_busy && !s.is_disabled).length;
   const taken = spots.filter((s) => s.is_busy).length;

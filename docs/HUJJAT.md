@@ -179,3 +179,18 @@ Sinov uchun 30 kunlik tarix: `npm run demo` (server papkasida).
 - Kirish chekida, chiqish chekida, arxivda, xabarda va boshliq sahifasida «♿ bepul» belgisi; 3D darvozada
   «Nogironlar uchun BEPUL» belgisi va yo'lda bo'yalgan belgi.
 - API: `POST /api/enter` `{ disabled_driver: true }`; `sessions.disabled_driver`, `spots.is_accessible`.
+
+## 12. Kirish sahifasi, yuklanish va oflayn rejim
+
+- **Yuklanish** — bosqichlar haqiqatan bajariladi: shriftlar, 3D dvigatel va personajlar, darvoza sahnasi,
+  server bilan aloqa (`GET /api/health`), saqlangan smena sessiyasi. Har bosqich tugaganda bitta mashina joyiga kiradi, foiz — tugagan bosqichlar ulushi.
+- **Oflayn** — build qilingan saytda `sw.js` sahifa va fayllarni keshlaydi: internet bo'lmasa ham sayt ochiladi.
+  Server javob bermasa, kirish sahifasida ogohlantirish chiqadi va har 5 soniyada qayta tekshiriladi. API so'rovlari keshlanmaydi.
+- **Premium kirish** — orqada qiyalatilgan tungi stoyanka (mashinalar kirib-chiqadi, yo'lakda faralar yuradi), oltin hoshiyali karta.
+- **Personajlar** — login yozilganda o'sha kishining 3D personaji: Aziz (ko'k forma, jilet), Bekzod (yashil forma, mo'ylov),
+  Dilshod (kulrang forma, ko'zoynak, qizil kepka), admin (to'q ko'k kostyum, galstuk, ko'zoynak). Yangi xodimlarga ism asosida
+  boshqa-boshqa forma. Boshliq sahifasi — eng elegant personaj (qora kostyum, oltin galstuk, qora ko'zoynak, oltin soat) kutib oladi.
+- **Kirish tugmasi** — bosilganda ichida 3D mashina kirib keladi; muvaffaqiyatda o'tib ketadi, personaj sakrab xursand bo'ladi
+  (konfetti); xatoda mashina orqaga qaytadi, personaj bosh chayqaydi.
+- **Vercel** — `avto-stoyanka/vercel.json` barcha yo'llarni `index.html` ga yo'naltiradi (`/boshliq` ham ochiladi).
+  Server manzili: build paytida `VITE_API=https://<server>/api` muhit o'zgaruvchisi.

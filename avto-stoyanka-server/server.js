@@ -55,6 +55,9 @@ async function auth(req, res, next) {
 }
 const adminOnly = (req, res, next) => next(req.user.role === 'admin' ? undefined : fail(403, 'Faqat admin uchun'));
 
+// Holat tekshiruvi (yuklanish ekrani va oflayn rejim uchun) — tokensiz
+app.get('/api/health', (req, res) => res.json({ ok: true }));
+
 // Boshliq sahifasi — login emas, maxfiy havola kaliti bilan
 mountBoss(app, pool, fail);
 

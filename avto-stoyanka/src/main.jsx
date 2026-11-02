@@ -12,3 +12,8 @@ createRoot(document.getElementById('root')).render(
     <Page />
   </StrictMode>,
 )
+
+// Oflayn rejim: sahifa fayllari keshlanadi (faqat build qilingan saytda; dev serverda HMR ga xalal bermasin)
+if (import.meta.env.PROD && 'serviceWorker' in navigator) {
+  window.addEventListener('load', () => navigator.serviceWorker.register('/sw.js').catch(() => {}))
+}

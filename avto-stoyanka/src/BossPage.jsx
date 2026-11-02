@@ -1,8 +1,30 @@
 // Boshliq sahifasi: maxfiy havola (/boshliq?key=...) orqali ochiladi, login kerak emas.
 // Tushum, ish haqi, xarajatlar va foyda — kunlik, haftalik, oylik; hammasi animatsiya bilan.
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { lazy, Suspense, useCallback, useEffect, useRef, useState } from 'react';
 import { API, money } from './api';
 import Icon from './Icon';
+
+const CharacterStage = lazy(() => import('./LoginScene'));
+
+// Kutib olish: elegant boshliq personaji sakrab salomlashadi, keyin hisobot ochiladi (bosilsa — darhol)
+function BossIntro({ onDone }) {
+  const [out, setOut] = useState(false);
+  useEffect(() => {
+    const a = setTimeout(() => setOut(true), reduced ? 0 : 2600);
+    const b = setTimeout(onDone, reduced ? 0 : 3200);
+    return () => { clearTimeout(a); clearTimeout(b); };
+  }, [onDone]);
+  return (
+    <div className={out ? 'boss-intro out' : 'boss-intro'} onClick={onDone} role="presentation">
+      <Suspense fallback={<div className="char-stage big" />}>
+        <div className="char-stage-wrap"><CharacterStage character="boss" mode="cheer" /></div>
+      </Suspense>
+      <p className="lux-badge"><Icon name="crown" /> Premium hisobot</p>
+      <h1>Xush kelibsiz, boshliq</h1>
+      <p className="muted">Stoyankangiz bugun qanday ishladi — hozir ko'rasiz</p>
+    </div>
+  );
+}
 
 const KEY = new URLSearchParams(window.location.search).get('key') || '';
 const PERIODS = [['day', 'Bugun'], ['week', 'Hafta'], ['month', 'Oy']];
@@ -173,6 +195,8 @@ export default function BossPage() {
   const [period, setPeriod] = useState('day');
   const [data, setData] = useState(null);
   const [error, setError] = useState('');
+  const [intro, setIntro] = useState(true);
+  const endIntro = useCallback(() => setIntro(false), []);
 
   const load = useCallback(() => bossApi(`?period=${period}`).then(setData, (e) => setError(e.message)), [period]);
   useEffect(() => {
@@ -198,6 +222,8 @@ export default function BossPage() {
   const premiumShare = t.revenue ? Math.round((t.premium_revenue / t.revenue) * 100) : 0;
 
   return (
+    <>
+    {intro && <BossIntro onDone={endIntro} />}
     <main className="boss" key={period}>
       <header className="boss-top">
         <div className="brand"><span className="p-sign sm" aria-hidden="true">P</span><span>AvtoStoyanka</span><small>Boshliq hisoboti</small></div>
@@ -295,5 +321,6 @@ export default function BossPage() {
         </section>
       </div>
     </main>
+    </>
   );
 }
