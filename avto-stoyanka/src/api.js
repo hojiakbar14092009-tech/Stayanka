@@ -42,3 +42,21 @@ export function paintFor(plate = '') {
   for (const c of plate) h = (h * 31 + c.charCodeAt(0)) >>> 0;
   return PAINTS[h % PAINTS.length];
 }
+
+// Mashina markasi raqamdan doimiy tanlanadi (haqiqiy tizimda kamera/ro'yxatdan keladi).
+// Premium joyga ko'pincha qimmat mashinalar qo'yiladi.
+export const LUXURY = ['Rolls-Royce', 'Bentley', 'Lamborghini', 'Ferrari', 'Porsche', 'Maybach', 'Mercedes G-Class', 'Range Rover', 'BMW M8', 'Lexus LX'];
+const COMMON = ['Chevrolet Cobalt', 'Chevrolet Gentra', 'Chevrolet Malibu', 'Chevrolet Tracker', 'Chevrolet Spark', 'Kia K5', 'Hyundai Sonata', 'BYD Song', 'Chevrolet Onix', 'Damas'];
+export function brandFor(plate = '', premium = false) {
+  let h = 7;
+  for (const c of plate) h = (h * 33 + c.charCodeAt(0)) >>> 0;
+  const list = premium ? LUXURY : COMMON;
+  return list[h % list.length];
+}
+export const isLuxury = (brand) => LUXURY.includes(brand);
+// Tepadan ko'rinish shakli: sport (past, uzun burun), suv (keng, to'rtburchak), sedan
+export function shapeFor(brand) {
+  if (/Lamborghini|Ferrari|Porsche|BMW M8/.test(brand)) return 'sport';
+  if (/G-Class|Range Rover|Lexus LX|Tracker|BYD|Damas/.test(brand)) return 'suv';
+  return 'sedan';
+}

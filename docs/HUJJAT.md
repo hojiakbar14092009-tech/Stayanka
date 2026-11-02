@@ -94,7 +94,10 @@ Harakat (faqat amalga javoban):
 ## 7. Qorovul uchun qulayliklar
 
 - **Ketma-ket to'ldirish:** B blok to'lmaguncha C ga o'tilmaydi. Premium joy avtomatik berilmaydi — faqat mijoz xohlasa («Premium, yopiq» tugmasi).
-- **Raqam kamerasi:** mashina shlagbaum oldida to'xtaydi, kamera oynasida old raqami ko'rinadi, raqam maydonga o'zi yoziladi. Qorovul tekshirib «Kirgizish»ni bosadi.
+- **Raqam kamerasi — avtomatik kiritish:** mashina shlagbaum oldida to'xtaydi, tor burchakli kamera raqamni yaqindan ko'rsatadi (aniqlik foizi bilan), raqam o'qiladi va mashina **o'zi** keyingi bo'sh oddiy joyga kiritiladi. Qorovul katta yozilgan raqamni ko'radi va **chek chop etish yoki etmaslikni** o'zi hal qiladi. Joy bo'lmasa yoki mashina allaqachon ichkarida bo'lsa — «Mashinani qaytarish».
+- Skaner, kirish cheki va chiqish cheki oynalari **chap tomonda** chiqadi — o'ngdagi kamera va raqam yopilmaydi. Chek qog'ozi qotmasdan, ravon chiqadi.
+- **Moykachilar jamoasi** (3 kishi, har biri boshqa forma va asbobda): har biri boshqa mashinani yuvadi, qimmat mashinani ko'rsa «Vuy j....b, Rolls-Royce-mi?!» deb hayron qoladi.
+- Mashina markasi raqamdan aniqlanadi (sinov uchun), rejada sedan, SUV va sport mashinalar har xil ko'rinadi.
 - **To'lay olmagan mijoz:** skanerda «To'lay olmadi — haydab chiqarish». 3D sahnada qorovul mashina yoniga yurib boradi, tsenzura belgilarida (#@$%!) baqiradi, shlagbaum ochiladi, mashina chiqib ketadi. Qarz keyingi kelishida chekda va xabarda ko'rinadi.
 - Xabarlar pastki chap burchakda, kichik — ish maydonini yopmaydi.
 

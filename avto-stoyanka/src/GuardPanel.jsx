@@ -1,6 +1,7 @@
-// Qorovul paneli: tepadan ko'rilgan stoyanka rejasi + o'ng tomonda qidiruv, darvoza, skaner va amal kartasi
+// Qorovul paneli: tepadan ko'rilgan stoyanka rejasi + o'ng tomonda qidiruv, darvoza (kamera), skaner va amal kartasi
 import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react';
-import { api, money, time, duration, calcFee, paintFor } from './api';
+import { api, money, time, duration, calcFee, paintFor, brandFor, isLuxury, shapeFor } from './api';
+import Icon from './Icon';
 import Receipt from './Receipt';
 import Ticket from './Ticket';
 import ScanModal from './ScanModal';
@@ -26,18 +27,26 @@ function useNow() {
   return now;
 }
 
-// Tepadan ko'rilgan mashina
-function Car({ plate, leaving, onDone }) {
+// Tepadan ko'rilgan mashina: markaga qarab sedan, SUV yoki sport shakli
+const BODIES = {
+  sedan: { body: 'M8 4 Q20 0 32 4 L36 16 L36 60 Q36 70 28 70 L12 70 Q4 70 4 60 L4 16 Z', glass: 'M9 22 Q20 15 31 22 L29 30 L11 30 Z', rear: 'M11 52 L29 52 L31 60 Q20 63 9 60 Z' },
+  suv: { body: 'M7 3 L33 3 Q37 3 37 8 L37 65 Q37 70 32 70 L8 70 Q3 70 3 65 L3 8 Q3 3 7 3 Z', glass: 'M7 17 L33 17 L31 26 L9 26 Z', rear: 'M9 58 L31 58 L32 64 L8 64 Z' },
+  sport: { body: 'M12 2 Q20 0 28 2 Q37 12 37 30 L36 62 Q34 70 26 70 L14 70 Q6 70 4 62 L3 30 Q3 12 12 2 Z', glass: 'M10 28 Q20 21 30 28 L28 36 L12 36 Z', rear: 'M12 52 L28 52 L29 57 Q20 60 11 57 Z' },
+};
+function Car({ plate, premium, leaving, onDone }) {
+  const shape = BODIES[shapeFor(brandFor(plate, premium))];
   return (
     <svg className={leaving ? 'car leaving' : 'car'} onAnimationEnd={leaving ? onDone : undefined} viewBox="0 0 40 72" aria-hidden="true">
-      <rect x="3" y="2" width="34" height="68" rx="11" fill={paintFor(plate)} />
-      <path d="M8 22 Q20 14 32 22 L30 30 L10 30 Z" fill="#1b2430" />
-      <rect x="10" y="31" width="20" height="20" rx="3" fill="rgba(0,0,0,.18)" />
-      <path d="M10 52 L30 52 L32 60 Q20 64 8 60 Z" fill="#1b2430" />
+      <path d={shape.body} fill={paintFor(plate)} />
+      <path d={shape.body} fill="url(#car-sheen)" />
+      <path d={shape.glass} fill="#1b2430" />
+      <path d={shape.rear} fill="#1b2430" />
       <rect x="6" y="3" width="7" height="3" rx="1.5" fill="#fff3c4" />
       <rect x="27" y="3" width="7" height="3" rx="1.5" fill="#fff3c4" />
       <rect x="6" y="66" width="7" height="3" rx="1.5" fill="#e5484d" />
       <rect x="27" y="66" width="7" height="3" rx="1.5" fill="#e5484d" />
+      <rect x="1" y="24" width="3" height="4" rx="1" fill={paintFor(plate)} />
+      <rect x="36" y="24" width="3" height="4" rx="1" fill={paintFor(plate)} />
     </svg>
   );
 }
@@ -45,7 +54,7 @@ function Car({ plate, leaving, onDone }) {
 // Joy. Mashina yo'lakdan burilib kiradi; chiqqanda orqaga yurib, yo'lak bo'ylab ketadi (lane: r = o'ngga, l = chapga).
 function Stall({ spot, face, lane, selected, found, onPick }) {
   const state = spot.is_disabled ? 'off' : spot.is_busy ? 'busy' : 'free';
-  const title = spot.is_disabled ? "ta'mirda" : spot.is_busy ? `band, ${spot.plate}` : "bo'sh";
+  const title = spot.is_disabled ? "ta'mirda" : spot.is_busy ? `band, ${spot.plate}, ${brandFor(spot.plate, spot.is_premium)}` : "bo'sh";
   // Chiqib ketayotgan mashinani animatsiya tugaguncha ko'rsatamiz
   const [prev, setPrev] = useState({ busy: spot.is_busy, plate: spot.plate });
   const [leaving, setLeaving] = useState(null);
@@ -62,30 +71,48 @@ function Stall({ spot, face, lane, selected, found, onPick }) {
       aria-pressed={selected}
     >
       <span className="stall-no">{spot.label.slice(2)}</span>
-      {spot.is_busy && <Car key={spot.session_id} plate={spot.plate} />}
-      {leaving && <Car key="out" plate={leaving} leaving onDone={() => setLeaving(null)} />}
+      {spot.is_busy && <Car key={spot.session_id} plate={spot.plate} premium={spot.is_premium} />}
+      {leaving && <Car key="out" plate={leaving} premium={spot.is_premium} leaving onDone={() => setLeaving(null)} />}
       {spot.is_busy && <span className="stall-plate">{spot.plate}</span>}
-      {found && <span className="pin" aria-hidden="true">▼</span>}
+      {found && <span className="pin" aria-hidden="true"><Icon name="pin" size="1.6em" /></span>}
     </button>
   );
 }
 
-// Moykachi: faqat mashina turgan joyga boradi. Mashinalar orasidan emas — yo'lak va chetki yo'lakcha bo'ylab yuradi.
-const WALK_SPEED = 55; // px/s
-function Washer({ lot, dirtyIds }) {
+// Moykachilar jamoasi: har biri boshqa ko'rinishda, boshqa tezlikda, boshqa asbob bilan
+const CREW = [
+  { name: 'Sardor', skin: '#e8b98f', outfit: '#2257d6', cap: '#1b2a55', stripe: '#f2c230', pants: '#3a3d43', tool: 'sponge', speed: 52 },
+  { name: 'Jasur', skin: '#c98f62', outfit: '#1f9a63', cap: '#f2c230', stripe: '#ffffff', pants: '#2a3140', tool: 'hose', speed: 46 },
+  { name: 'Otabek', skin: '#f0caa4', outfit: '#c2410c', cap: '#ffffff', stripe: '#1b2430', pants: '#4a4d52', tool: 'brush', speed: 58 },
+];
+const TOOLS = {
+  sponge: <rect x="28" y="11" width="6" height="5" rx="2" fill="#f2c230" />,
+  hose: <><path d="M31 15 q4 -1 5 -5" stroke="#1b2430" strokeWidth="2" fill="none" /><circle cx="36" cy="9" r="1.6" fill="#9fd3ff" /></>,
+  brush: <><rect x="29" y="8" width="2.5" height="9" rx="1" fill="#8a6a3a" /><rect x="27.5" y="6" width="5.5" height="3" rx="1" fill="#e5484d" /></>,
+};
+
+// Moykachi: faqat mashina turgan joyga boradi, mashinalar orasidan emas — yo'lak va chetki yo'lakcha bo'ylab yuradi.
+// Qimmat mashinani ko'rsa, boshi yonida hayronlik xabari chiqadi.
+function Washer({ lot, dirtyIds, crew, index, claims, plates }) {
   const el = useRef(null);
+  const body = useRef(null);
+  const say = useRef(null);
   const dirty = useRef(dirtyIds);
-  useEffect(() => { dirty.current = dirtyIds; }, [dirtyIds]);
+  const platesRef = useRef(plates);
+  useEffect(() => {
+    dirty.current = dirtyIds;
+    platesRef.current = plates;
+  }, [dirtyIds, plates]);
 
   useEffect(() => {
     const lotEl = lot.current;
     const me = el.current;
-    const speed = window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 1e6 : WALK_SPEED;
+    const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
     const lanes = () => [...lotEl.querySelectorAll('.lane')].map((l) => l.offsetTop + l.offsetHeight / 2);
-    const EDGE = 10; // zona chetidagi piyoda yo'lakcha
-    const st = { x: EDGE, y: lanes()[0], laneY: lanes()[0], path: [], target: null, wash: 0, face: 1, sway: 0 };
+    const EDGE = 10 + index * 6; // zona chetidagi piyoda yo'lakcha
+    const home = () => lanes()[index % 2];
+    const st = { x: EDGE, y: home(), laneY: home(), path: [], target: null, wash: 0, face: 1, v: 0, sayUntil: 0, rest: index * 2.5 };
 
-    // Hozirgi joydan mashina yoniga yo'l: o'z yo'lagiga chiqadi → kerak bo'lsa chetdan boshqa yo'lakka → mashina yoniga
     const routeTo = (x, y, laneY) => {
       const p = [{ x: st.x, y: st.laneY }];
       if (laneY !== st.laneY) p.push({ x: EDGE, y: st.laneY }, { x: EDGE, y: laneY });
@@ -93,27 +120,33 @@ function Washer({ lot, dirtyIds }) {
       st.path = p;
       st.laneY = laneY;
     };
+    const release = () => {
+      if (st.target && claims.get(st.target) === index) claims.delete(st.target);
+    };
     const goWash = (id) => {
       const s = lotEl.querySelector(`[data-spot="${id}"]`);
       if (!s) return;
       const ls = lanes();
       const down = s.classList.contains('down');
       const laneY = down ? ls.find((y) => y > s.offsetTop) : [...ls].reverse().find((y) => y < s.offsetTop);
-      // mashinaning yon tomoni, joyning ochiq qismiga yaqin
+      release();
+      claims.set(id, index);
       routeTo(s.offsetLeft + s.offsetWidth / 2 + 24, s.offsetTop + s.offsetHeight * (down ? 0.62 : 0.38), laneY);
       st.target = id;
       st.wash = 0;
+      st.greeted = false;
     };
+    // Boshqa moykachi band qilmagan mashinani tanlaydi
     const next = () => {
-      const ids = dirty.current;
-      if (!ids.length) {
-        const home = lanes()[0];
+      const free = dirty.current.filter((id) => !claims.has(id) || claims.get(id) === index);
+      const options = free.filter((id) => id !== st.target);
+      if (!options.length && !free.includes(st.target)) {
+        release();
         st.target = null;
-        if (st.x !== EDGE || st.y !== home) routeTo(EDGE, home, home);
+        if (st.x !== EDGE || st.y !== home()) routeTo(EDGE, home(), home());
         return;
       }
-      const i = ids.indexOf(st.target);
-      goWash(ids[(i + 1) % ids.length]);
+      if (options.length) goWash(options[(index + Math.floor(Math.random() * options.length)) % options.length]);
     };
 
     let raf;
@@ -121,9 +154,10 @@ function Washer({ lot, dirtyIds }) {
     const tick = (now) => {
       const dt = Math.min(0.05, (now - last) / 1000);
       last = now;
-      const ids = dirty.current;
-      if (st.target && !ids.includes(st.target)) next(); // mashina ketdi — boshqasiga
-      else if (!st.target && !st.path.length && ids.length) next();
+      const t = now / 1000;
+      if (st.rest > 0) st.rest -= dt; // jamoa birdan emas, navbat bilan ishga tushadi
+      else if (st.target && !dirty.current.includes(st.target)) next(); // mashina ketdi — boshqasiga
+      else if (!st.target && !st.path.length) next();
 
       let mode = 'idle';
       if (st.path.length) {
@@ -131,7 +165,10 @@ function Washer({ lot, dirtyIds }) {
         const dx = p.x - st.x;
         const dy = p.y - st.y;
         const d = Math.hypot(dx, dy);
-        const step = speed * dt;
+        // yumshoq tezlanish va to'xtash
+        const want = reduced ? 1e6 : crew.speed * Math.min(1, 0.35 + d / 40);
+        st.v += (want - st.v) * Math.min(1, dt * 4);
+        const step = st.v * dt;
         if (d <= step) {
           st.x = p.x;
           st.y = p.y;
@@ -143,32 +180,55 @@ function Washer({ lot, dirtyIds }) {
         if (Math.abs(dx) > 0.5) st.face = Math.sign(dx);
         mode = 'walking';
       } else if (st.target) {
+        st.v = 0;
         st.face = -1; // mashinaga qarab
         st.wash += dt;
-        st.sway = Math.sin(st.wash * 1.3) * 4; // mashina bo'ylab u yoq-bu yoqqa
         mode = 'washing';
-        if (st.wash > 8 && ids.length > 1) next();
+        if (!st.greeted) {
+          st.greeted = true;
+          const brand = brandFor(platesRef.current[st.target] || '', true);
+          if (isLuxury(brand)) {
+            say.current.querySelector('b').textContent = `Vuy j....b, ${brand}-mi?!`;
+            st.sayUntil = t + 3.6;
+          }
+        }
+        if (st.wash > 9 + index * 2) next();
       }
-      me.className = `washer ${mode}`;
-      me.style.transform = `translate(${st.x - 15 + (mode === 'washing' ? st.sway : 0)}px, ${st.y - 36}px) scaleX(${st.face})`;
+      const sway = mode === 'washing' ? Math.sin(st.wash * 1.4 + index) * 4 : 0;
+      const breathe = mode === 'idle' ? Math.sin(t * 2 + index) * 0.6 : 0;
+      me.className = `washer crew-${index} ${mode}`;
+      me.style.transform = `translate(${st.x - 15 + sway}px, ${st.y - 36 + breathe}px)`;
+      body.current.style.transform = `scaleX(${st.face})`;
+      say.current.className = `washer-say${t < st.sayUntil ? ' on' : ''}`;
       raf = requestAnimationFrame(tick);
     };
     raf = requestAnimationFrame(tick);
-    return () => cancelAnimationFrame(raf);
-  }, [lot]);
+    return () => {
+      cancelAnimationFrame(raf);
+      release();
+    };
+  }, [lot, crew, index, claims]);
 
   return (
     <div className="washer" ref={el} aria-hidden="true">
-      <svg viewBox="0 0 32 44">
-        <circle cx="16" cy="7" r="6" fill="#e8b98f" />
-        <path d="M10 5 Q16 -1 22 5 Z" fill="#2257d6" />
-        <rect x="9" y="13" width="14" height="16" rx="4" fill="#2257d6" />
-        <rect x="9" y="17" width="14" height="3" fill="#f2c230" />
-        <rect className="leg-l" x="10" y="29" width="5" height="12" rx="2" fill="#3a3d43" />
-        <rect className="leg-r" x="17" y="29" width="5" height="12" rx="2" fill="#3a3d43" />
-        <g className="washer-arm"><rect x="21" y="14" width="10" height="4" rx="2" fill="#2257d6" /><rect x="28" y="10" width="4" height="9" rx="1.5" fill="#f2c230" /></g>
-      </svg>
-      <span className="bubbles"><i /><i /><i /><i /></span>
+      <div className="washer-say" ref={say}>
+        <span className="wow"><Icon name="wow" size="1.3em" /><Icon name="crown" size="1em" /></span>
+        <b />
+      </div>
+      <div className="washer-body" ref={body}>
+        <svg viewBox="0 0 38 44">
+          <circle cx="16" cy="7" r="6" fill={crew.skin} />
+          <path d="M10 5 Q16 -1 22 5 Z" fill={crew.cap} />
+          <rect x="21" y="4" width="4" height="1.6" rx=".8" fill={crew.cap} />
+          <rect x="9" y="13" width="14" height="16" rx="4" fill={crew.outfit} />
+          <rect x="9" y="17" width="14" height="2.5" fill={crew.stripe} />
+          <rect x="9" y="22" width="14" height="2.5" fill={crew.stripe} opacity=".7" />
+          <rect className="leg-l" x="10" y="29" width="5" height="12" rx="2" fill={crew.pants} />
+          <rect className="leg-r" x="17" y="29" width="5" height="12" rx="2" fill={crew.pants} />
+          <g className="washer-arm"><rect x="21" y="14" width="10" height="4" rx="2" fill={crew.outfit} />{TOOLS[crew.tool]}</g>
+        </svg>
+        <span className="bubbles"><i /><i /><i /><i /></span>
+      </div>
     </div>
   );
 }
@@ -176,8 +236,10 @@ function Washer({ lot, dirtyIds }) {
 // Zona: 4 qator × 10 joy. Ikki qator orasida yo'lak, o'rtada bordyur. Premium zona — yopiq tom ostida.
 function LotMap({ spots, selectedId, foundIds, onPick }) {
   const lot = useRef(null);
+  const claims = useMemo(() => new Map(), []); // qaysi mashinani qaysi moykachi yuvyapti
   const premium = spots[0]?.is_premium;
   const dirtyIds = useMemo(() => spots.filter((s) => s.is_premium && s.is_busy).map((s) => s.id), [spots]);
+  const plates = useMemo(() => Object.fromEntries(spots.map((s) => [s.id, s.plate])), [spots]);
 
   const rows = [0, 1, 2, 3].map((r) => spots.slice(r * 10, r * 10 + 10));
   const row = (list, face, lane) => (
@@ -189,15 +251,25 @@ function LotMap({ spots, selectedId, foundIds, onPick }) {
   );
   return (
     <div className="lot-scroll">
+      <svg width="0" height="0" aria-hidden="true">
+        <defs>
+          <linearGradient id="car-sheen" x1="0" y1="0" x2="1" y2="0">
+            <stop offset="0" stopColor="#000" stopOpacity=".25" />
+            <stop offset=".35" stopColor="#fff" stopOpacity=".18" />
+            <stop offset=".6" stopColor="#fff" stopOpacity="0" />
+            <stop offset="1" stopColor="#000" stopOpacity=".28" />
+          </linearGradient>
+        </defs>
+      </svg>
       <div className={`lot${premium ? ' covered' : ''}`} ref={lot}>
         {row(rows[0], 'down', 'r')}
         <div className="lane"><span>⟶</span><span>⟶</span><span>⟶</span></div>
         {row(rows[1], 'up', 'r')}
-        <div className="curb">{premium && <span>Yopiq premium to'xtash joyi. Moykachi xizmatda</span>}</div>
+        <div className="curb">{premium && <span><Icon name="crown" /> Yopiq premium to'xtash joyi. Moykachilar xizmatda <Icon name="drop" /></span>}</div>
         {row(rows[2], 'down', 'l')}
         <div className="lane"><span>⟵</span><span>⟵</span><span>⟵</span></div>
         {row(rows[3], 'up', 'l')}
-        {premium && <Washer lot={lot} dirtyIds={dirtyIds} />}
+        {premium && CREW.map((c, i) => <Washer key={c.name} lot={lot} dirtyIds={dirtyIds} crew={c} index={i} claims={claims} plates={plates} />)}
       </div>
     </div>
   );
@@ -225,9 +297,10 @@ export default function GuardPanel({ spots, tariff, reload, lastEvent, notify })
   const [error, setError] = useState('');
   const [receipt, setReceipt] = useState(null);
   const [ticket, setTicket] = useState(null);
-  const [premium, setPremium] = useState(false); // mijoz premium joy so'radimi
+  const [premium, setPremium] = useState(false); // qo'lda kiritishda: mijoz premium joy so'radimi
   const [arrival, setArrival] = useState(null); // kamera oldiga kelgan mashina
-  const [camRead, setCamRead] = useState('');
+  const [arrived, setArrived] = useState(null); // kamera o'qigan va avtomatik kiritilgan mashina
+  const [reject, setReject] = useState(null); // kiritib bo'lmadi — mashina orqaga qaytariladi
   const plateInput = useRef(null);
   const now = useNow();
 
@@ -238,13 +311,20 @@ export default function GuardPanel({ spots, tariff, reload, lastEvent, notify })
     [spots, premium]
   );
 
-  // Kamera raqamni o'qidi — maydonga yoziladi, qorovul faqat tekshirib "Kirgizish"ni bosadi
-  const plateRead = (p) => {
-    setPlate(p);
-    setCamRead(p);
-    setSelectedId(null);
-    plateInput.current?.focus();
-  };
+  // Kamera raqamni o'qidi → avtomatik keyingi bo'sh oddiy joyga kiritiladi. Chek berish — qorovul qarori.
+  async function plateRead(p) {
+    setArrived({ plate: p, status: 'saving' });
+    try {
+      const { spot, ticket: t } = await api('/enter', { method: 'POST', body: { plate: p } });
+      setArrived({ plate: p, status: 'in', spot, ticket: t });
+      setSelectedId(null);
+      setZone(spot.zone);
+      await reload();
+    } catch (err) {
+      setArrived({ plate: p, status: 'error', error: err.message });
+    }
+  }
+
   // Qidiruv: hamma 200 joy bo'ylab — raqam yoki chek raqami bo'yicha
   const term = norm(search);
   const matches = term.length >= 2
@@ -272,6 +352,7 @@ export default function GuardPanel({ spots, tariff, reload, lastEvent, notify })
     setTimeout(() => plateInput.current?.focus());
   };
 
+  // Qo'lda kiritish (kamera ishlamasa yoki piyoda kelgan mijoz uchun)
   async function enter(e) {
     e.preventDefault();
     setBusy(true);
@@ -282,7 +363,6 @@ export default function GuardPanel({ spots, tariff, reload, lastEvent, notify })
         body: { plate, premium, spot_id: selected && !selected.is_busy ? selected.id : undefined },
       });
       setPlate('');
-      setCamRead('');
       setPremium(false);
       setSelectedId(null);
       setZone(spot.zone);
@@ -313,7 +393,7 @@ export default function GuardPanel({ spots, tariff, reload, lastEvent, notify })
 
   const zoneSpots = spots.filter((s) => s.zone === zone);
   const stayMs = selected?.entered_at ? now - new Date(selected.entered_at) : 0;
-  const firstHour = (premium) => tariff && money(premium ? tariff.premium_hour : tariff.base_hour);
+  const firstHour = (prem) => tariff && money(prem ? tariff.premium_hour : tariff.base_hour);
 
   return (
     <div className="guard">
@@ -326,7 +406,7 @@ export default function GuardPanel({ spots, tariff, reload, lastEvent, notify })
             return (
               <button key={z} className={`zone-tab${z === zone ? ' on' : ''}${list[0]?.is_premium ? ' premium' : ''}${hits ? ' has-hit' : ''}`} onClick={() => setZone(z)} aria-pressed={z === zone}>
                 <b>{z}</b>
-                <span>{z === 'A' ? 'Premium' : `Zona ${z}`}</span>
+                <span>{z === 'A' ? <><Icon name="crown" size="1em" /> Premium</> : `Zona ${z}`}</span>
                 <em>{hits ? `${hits} ta topildi` : `${free} bo'sh`}</em>
                 <MiniMap list={list} foundIds={foundIds} />
               </button>
@@ -335,13 +415,16 @@ export default function GuardPanel({ spots, tariff, reload, lastEvent, notify })
         </nav>
         <LotMap spots={zoneSpots} selectedId={selectedId} foundIds={foundIds} onPick={pick} />
         <p className="legend">
-          <span className="key free" /> bo'sh <span className="key busy" /> band <span className="key off" /> ta'mirda <span className="key premium" /> premium, yopiq
+          <span className="key free" /> bo'sh <span className="key busy" /> band <span className="key off" /> ta'mirda <Icon name="crown" /> premium, yopiq
         </p>
       </section>
 
       <aside className="dock">
         <div className="finder">
-          <input className="input search" placeholder="Mashinani topish: raqamning istalgan qismi" value={search} onChange={(e) => findCar(e.target.value)} aria-label="Mashinani topish" />
+          <label className="input-icon">
+            <Icon name="search" />
+            <input className="input search" placeholder="Mashinani topish: raqamning istalgan qismi" value={search} onChange={(e) => findCar(e.target.value)} aria-label="Mashinani topish" />
+          </label>
           {term.length >= 2 && (
             matches.length ? (
               <ul className="results">
@@ -361,16 +444,54 @@ export default function GuardPanel({ spots, tariff, reload, lastEvent, notify })
         </div>
 
         <form className="scan-form" onSubmit={scan}>
-          <input className="input" placeholder="QR chekni skanerlang yoki raqamini yozing" value={scanCode} onChange={(e) => setScanCode(e.target.value)} aria-label="Chek raqami" />
-          <button className="btn primary">Skaner</button>
+          <label className="input-icon">
+            <Icon name="scan" />
+            <input className="input" placeholder="QR chekni skanerlang yoki raqamini yozing" value={scanCode} onChange={(e) => setScanCode(e.target.value)} aria-label="Chek raqami" />
+          </label>
+          <button className="btn primary"><Icon name="scan" /> Skaner</button>
         </form>
 
         <Suspense fallback={<div className="gate" />}>
-          <Gate3D event={lastEvent} arrival={arrival} onPlateRead={plateRead} />
+          <Gate3D event={lastEvent} arrival={arrival} reject={reject} onPlateRead={plateRead} />
         </Suspense>
         <button className="btn ghost sm cam-demo" onClick={() => setArrival({ plate: randomPlate(), at: Date.now() })}>
-          Kamera oldiga mashina keldi (sinov)
+          <Icon name="camera" /> Kamera oldiga mashina keldi (sinov)
         </button>
+
+        {arrived && (
+          <div className={`card arrived ${arrived.status}`} role="status">
+            <p className="arrived-head"><Icon name="camera" /> Kamera o'qigan raqam</p>
+            <p className="plate xl">{arrived.plate}</p>
+            {arrived.status === 'saving' && <p className="muted">Bo'sh joy tanlanmoqda…</p>}
+            {arrived.status === 'in' && (
+              <>
+                <p className="arrived-spot">
+                  <Icon name="check" /> Avtomatik kiritildi: <b>{arrived.spot.label}</b>
+                  <span className="muted"> {brandFor(arrived.plate, arrived.spot.is_premium)}</span>
+                </p>
+                {arrived.ticket.debt > 0 && <p className="error"><Icon name="warning" /> Oldingi qarzi: {money(arrived.ticket.debt)}</p>}
+                <p className="muted small">Haydovchiga chek berilsinmi?</p>
+                <div className="arrived-actions">
+                  <button className="btn primary" onClick={() => { setTicket(arrived.ticket); setArrived(null); }} autoFocus>
+                    <Icon name="print" /> Chek chop etish
+                  </button>
+                  <button className="btn ghost" onClick={() => setArrived(null)}>Chek kerak emas</button>
+                </div>
+              </>
+            )}
+            {arrived.status === 'error' && (
+              <>
+                <p className="error" role="alert"><Icon name="warning" /> {arrived.error}</p>
+                <div className="arrived-actions">
+                  <button className="btn danger" onClick={() => { setReject({ plate: arrived.plate, at: Date.now() }); setArrived(null); }}>
+                    <Icon name="exit" /> Mashinani qaytarish
+                  </button>
+                  <button className="btn ghost" onClick={() => plateRead(arrived.plate)}>Qayta urinish</button>
+                </div>
+              </>
+            )}
+          </div>
+        )}
 
         <div className="card action" key={selected?.id ?? 'quick'}>
           {selected?.is_disabled ? (
@@ -383,25 +504,29 @@ export default function GuardPanel({ spots, tariff, reload, lastEvent, notify })
               <h2>{selected.label} <small>band</small></h2>
               <p className="plate lg">{selected.plate}</p>
               <dl className="facts">
+                <dt>Marka</dt><dd>{brandFor(selected.plate, selected.is_premium)}</dd>
                 <dt>Kirdi</dt><dd>{time(selected.entered_at)}</dd>
                 <dt>Turibdi</dt><dd>{duration(stayMs)}</dd>
                 <dt>Hozirgi narx</dt><dd className="price">{tariff && money(calcFee(stayMs, tariff, selected.is_premium))}</dd>
               </dl>
-              <button className="btn danger big" onClick={() => setScanning(selected.ticket_no)} disabled={!selected.ticket_no}>Chekni skanerlab chiqarish</button>
-              <button className="btn ghost" onClick={() => setTicket({ ...selected, guard_in_name: selected.guard_name, active: true, tariff })}>Kirish chekini ko'rsatish</button>
+              <button className="btn danger big" onClick={() => setScanning(selected.ticket_no)} disabled={!selected.ticket_no}>
+                <Icon name="scan" /> Chekni skanerlab chiqarish
+              </button>
+              <button className="btn ghost" onClick={() => setTicket({ ...selected, guard_in_name: selected.guard_name, active: true, tariff })}>
+                <Icon name="ticket" /> Kirish chekini ko'rsatish
+              </button>
             </>
           ) : (
             <form onSubmit={enter}>
               <h2>
-                {selected ? <>{selected.label} joyiga kirgizish</> : <>Keyingi bo'sh joy: <span className="next">{nextFree?.label ?? "yo'q"}</span></>}
+                {selected ? <>{selected.label} joyiga kirgizish</> : <>Qo'lda kiritish. Keyingi joy: <span className="next">{nextFree?.label ?? "yo'q"}</span></>}
               </h2>
               {!selected && (
                 <div className="seg wide" role="group" aria-label="Joy turi — mijoz tanlaydi">
                   <button type="button" className={premium ? '' : 'on'} onClick={() => setPremium(false)}>Oddiy joy</button>
-                  <button type="button" className={premium ? 'on gold-on' : ''} onClick={() => setPremium(true)}>Premium, yopiq</button>
+                  <button type="button" className={premium ? 'on gold-on' : ''} onClick={() => setPremium(true)}><Icon name="crown" /> Premium, yopiq</button>
                 </div>
               )}
-              {camRead && plate === camRead && <p className="cam-hint">Kamera o'qidi. Raqamni tekshirib, kirgizing</p>}
               <input
                 ref={plateInput}
                 className="input plate-input"
@@ -409,10 +534,11 @@ export default function GuardPanel({ spots, tariff, reload, lastEvent, notify })
                 value={plate}
                 onChange={(e) => setPlate(e.target.value.toUpperCase())}
                 aria-label="Mashina raqami"
-                autoFocus
                 maxLength={14}
               />
-              <button className="btn primary big" disabled={busy || !plate.trim() || (!selected && !nextFree)}>Kirgizish va chek berish</button>
+              <button className="btn primary big" disabled={busy || !plate.trim() || (!selected && !nextFree)}>
+                <Icon name="ticket" /> Kirgizish va chek berish
+              </button>
               {tariff && (
                 <p className="muted small">
                   1-soat {firstHour(selected ? selected.is_premium : premium)}, har keyingi soat +{money(tariff.step_hour)}
