@@ -81,8 +81,8 @@ function buildCar() {
   const head = mat(0xfff3c4, { emissive: 0xfff3c4, emissiveIntensity: 1.4 });
   const tail = mat(0x8a1c20, { emissive: 0xe5484d, emissiveIntensity: 0.4 });
   for (const z of [0.33, -0.33]) {
-    body.add(box(0.04, 0.09, 0.22, head, { x: 1.16, y: 0.48, z, shadow: false }));
-    body.add(box(0.04, 0.09, 0.24, tail, { x: -1.15, y: 0.55, z, shadow: false }));
+    body.add(box(0.03, 0.09, 0.22, head, { x: 1.225, y: 0.48, z, shadow: false }));
+    body.add(box(0.03, 0.09, 0.24, tail, { x: -1.185, y: 0.55, z, shadow: false }));
   }
   for (const z of [0.55, -0.55]) {
     const mirror = box(0.1, 0.07, 0.1, paint, { x: 0.45, y: 0.68, z });
@@ -91,8 +91,8 @@ function buildCar() {
     body.add(box(0.6, 0.012, 0.005, mat(0x111111), { x: -0.05, y: 0.46, z: z * 0.9, shadow: false })); // eshik chizig'i
     body.add(box(0.005, 0.3, 0.005, mat(0x111111), { x: -0.16, y: 0.47, z: z * 0.9, shadow: false }));
   }
-  body.add(box(0.03, 0.08, 0.5, mat(0x15171a, { metalness: 0.6, roughness: 0.3 }), { x: 1.17, y: 0.48, shadow: false })); // panjara
-  body.add(box(0.03, 0.04, 0.96, mat(0x2a2c30), { x: 1.18, y: 0.27, shadow: false })); // bamper
+  body.add(box(0.03, 0.08, 0.5, mat(0x15171a, { metalness: 0.6, roughness: 0.3 }), { x: 1.228, y: 0.46, shadow: false })); // panjara
+  body.add(box(0.03, 0.04, 0.96, mat(0x2a2c30), { x: 1.232, y: 0.255, shadow: false })); // bamper
 
   // Old va orqa raqam — bitta tekstura
   const canvas = document.createElement('canvas');
@@ -102,9 +102,10 @@ function buildCar() {
   plateTex.colorSpace = THREE.SRGBColorSpace;
   plateTex.anisotropy = 4;
   const plateMat = new THREE.MeshStandardMaterial({ map: plateTex, emissiveMap: plateTex, emissive: 0xffffff, emissiveIntensity: 0.35, roughness: 0.4 });
-  const front = mesh(new THREE.PlaneGeometry(0.42, 0.092), plateMat, { x: 1.2, y: 0.33, shadow: false });
+  // Raqam kuzov sirtidan 1,5 sm oldinda — bevel ichida qolib ketmasin
+  const front = mesh(new THREE.PlaneGeometry(0.42, 0.092), plateMat, { x: 1.24, y: 0.34, shadow: false });
   front.rotation.y = Math.PI / 2;
-  const back = mesh(new THREE.PlaneGeometry(0.42, 0.092), plateMat, { x: -1.18, y: 0.37, shadow: false });
+  const back = mesh(new THREE.PlaneGeometry(0.42, 0.092), plateMat, { x: -1.19, y: 0.38, shadow: false });
   back.rotation.y = -Math.PI / 2;
   body.add(front, back);
 
@@ -726,8 +727,11 @@ export default function Gate3D({ event, arrival, reject, release, onPlateRead })
       if (camState && cars[camState.lane].visible) {
         const car = cars[camState.lane];
         const dir = camState.cam === 'in' ? 1 : -1;
-        plateCam.position.copy(dir > 0 ? CAM_IN : CAM_OUT).setY((dir > 0 ? CAM_IN : CAM_OUT).y + 0.2);
-        look.set(car.position.x + dir * 1.2, 0.33, car.position.z);
+        // Ob'ektiv kamera qutisining ichida — ko'rish nuqtasini 0,35 m oldinga (raqam tomonga) chiqaramiz
+        look.set(car.position.x + dir * 1.24, 0.34, car.position.z);
+        plateCam.position.copy(dir > 0 ? CAM_IN : CAM_OUT);
+        plateCam.position.y += 0.2;
+        plateCam.position.add(look.clone().sub(plateCam.position).normalize().multiplyScalar(0.35));
         plateCam.lookAt(look);
         const iw = Math.round(w * 0.46);
         const ih = Math.round(iw * 0.62);
@@ -744,8 +748,11 @@ export default function Gate3D({ event, arrival, reject, release, onPlateRead })
           cb.style.height = `${ih}px`;
           cb.querySelector('.cam-rec').textContent = dir > 0 ? 'KAMERA 1, KIRISH' : 'KAMERA 2, CHIQISH';
           cb.querySelector('.cam-conf').textContent = `aniqlik ${Math.min(99.8, 90 + (1 - Math.min(1, Math.abs(car.userData.v) / 6)) * 9.8).toFixed(1)}%`;
-          const t = cb.querySelector('.cam-read');
-          if (t.textContent !== camState.plate) t.textContent = camState.plate;
+          const t = cb.querySelector('.cam-read b');
+          if (t.textContent !== camState.plate) {
+            t.textContent = camState.plate;
+            drawPlate(cb.querySelector('.cam-plate').getContext('2d'), camState.plate); // o'qilgan raqam kesimi
+          }
         }
       } else if (cb && cb.className !== 'cam-box') {
         cb.className = 'cam-box';
@@ -813,7 +820,7 @@ export default function Gate3D({ event, arrival, reject, release, onPlateRead })
       <div className="cam-box" ref={camBox} aria-hidden="true">
         <span className="cam-rec">KAMERA 1</span>
         <span className="cam-frame" />
-        <span className="cam-read" />
+        <span className="cam-read"><canvas className="cam-plate" width="512" height="112" /><b /></span>
         <span className="cam-conf" />
       </div>
       <div className="say" ref={bubble} aria-hidden="true" />

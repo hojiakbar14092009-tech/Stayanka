@@ -570,3 +570,11 @@ label { display: grid; gap: .3rem; font-size: .9rem; color: var(--paint-dim); }
 @keyframes wow { from { transform: rotate(-10deg) scale(.95); } to { transform: rotate(10deg) scale(1.15); } }
 .washer.idle svg { animation: breathe 2.4s ease-in-out infinite; }
 @keyframes breathe { 50% { transform: translateY(-1px) scaleY(1.02); } }
+
+/* Raqam kamerasi yozuvlari: tepada nom va aniqlik, pastda o'qilgan raqam plastinkasi */
+.cam-rec { right: 6px; font-size: .62rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.cam-conf { top: auto; bottom: 34px; right: 6px; font-size: .62rem; z-index: 1; }
+.cam-read { display: flex; align-items: center; gap: 6px; font-size: .8rem; white-space: nowrap; }
+.cam-box.locked .cam-read::before { content: none; }
+.cam-plate { height: 22px; width: auto; border-radius: 2px; flex: none; }
+.cam-read b { color: #33e08b; letter-spacing: .06em; }
