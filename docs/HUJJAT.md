@@ -49,6 +49,7 @@ Minimal — 1 soat. Admin tarifni paneldan o'zgartiradi.
 | GET | `/api/spots` | qorovul | 200 joy, id tartibida, ochiq sessiya bilan |
 | POST | `/api/enter` | qorovul | `{spot_id?, plate}` — joy band, yangi sessiya. `spot_id` bo'lmasa keyingi bo'sh joy |
 | GET | `/api/tickets/:code` | qorovul | QR chek yoki mashina raqami bo'yicha: chek faolmi, qaysi joyda, hozirgi narx |
+| PUT | `/api/expel/:spot_id` | qorovul | mijoz to'lay olmadi: haydab chiqariladi, summa qarz (`paid = false`, chek `QZ-`) bo'lib yoziladi, tushumga qo'shilmaydi |
 | PUT | `/api/exit/:spot_id` | qorovul | joy bo'sh, sessiya yopiladi, narx hisoblanadi, chek qaytadi |
 | GET | `/api/revenue` | qorovul | bugungi tushum (SUM) |
 | GET | `/api/receipts` | qorovul | cheklar arxivi (`q`, `from`, `to`) |
@@ -91,6 +92,11 @@ Harakat (faqat amalga javoban):
 - `prefers-reduced-motion` — animatsiyalar o'chadi.
 
 ## 7. Qorovul uchun qulayliklar
+
+- **Ketma-ket to'ldirish:** B blok to'lmaguncha C ga o'tilmaydi. Premium joy avtomatik berilmaydi — faqat mijoz xohlasa («Premium, yopiq» tugmasi).
+- **Raqam kamerasi:** mashina shlagbaum oldida to'xtaydi, kamera oynasida old raqami ko'rinadi, raqam maydonga o'zi yoziladi. Qorovul tekshirib «Kirgizish»ni bosadi.
+- **To'lay olmagan mijoz:** skanerda «To'lay olmadi — haydab chiqarish». 3D sahnada qorovul mashina yoniga yurib boradi, tsenzura belgilarida (#@$%!) baqiradi, shlagbaum ochiladi, mashina chiqib ketadi. Qarz keyingi kelishida chekda va xabarda ko'rinadi.
+- Xabarlar pastki chap burchakda, kichik — ish maydonini yopmaydi.
 
 - Kirishda QR kodli chek chop etiladi (joy raqami katta yozilgan).
 - Chiqishda chek skanerlanadi: lazer animatsiyasi, keyin «Chek faol» va to'lov summasi. Qayta skanerlansa — «Chek faol emas». USB QR skaner ham ishlaydi: u kodni yozib Enter bosadi.

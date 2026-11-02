@@ -43,10 +43,13 @@ export default function ScanModal({ code, onClose, onExit }) {
     return () => window.removeEventListener('keydown', onKey);
   }, [onClose]);
 
-  async function exit() {
+  const [confirmExpel, setConfirmExpel] = useState(false);
+
+  // paid = false: mijoz to'lay olmadi, qorovul haydab chiqaradi, summa qarz bo'lib yoziladi
+  async function exit(paid = true) {
     setBusy(true);
     try {
-      onExit(await api(`/exit/${ticket.spot_id}`, { method: 'PUT' }));
+      onExit(await api(`/${paid ? 'exit' : 'expel'}/${ticket.spot_id}`, { method: 'PUT' }));
     } catch (e) {
       setExitError(e.message);
       setBusy(false);
@@ -80,13 +83,22 @@ export default function ScanModal({ code, onClose, onExit }) {
               <dt>Turdi</dt><dd>{duration(stay)}</dd>
               <dt>To'lov</dt><dd className="price">{money(calcFee(stay, ticket.tariff, ticket.is_premium))}</dd>
             </dl>
-            <button className="btn danger big" onClick={exit} disabled={busy} autoFocus>Chiqarish va chek berish</button>
+            <button className="btn danger big" onClick={() => exit(true)} disabled={busy} autoFocus>To'landi: chiqarish va chek berish</button>
+            {confirmExpel ? (
+              <div className="expel-confirm">
+                <p>{money(calcFee(stay, ticket.tariff, ticket.is_premium))} qarz bo'lib yoziladi. Haydab chiqarasizmi?</p>
+                <button className="btn ghost sm" onClick={() => setConfirmExpel(false)}>Yo'q</button>
+                <button className="btn sm danger" onClick={() => exit(false)} disabled={busy}>Ha, haydab chiqarish</button>
+              </div>
+            ) : (
+              <button className="btn ghost danger-text" onClick={() => setConfirmExpel(true)}>To'lay olmadi — haydab chiqarish</button>
+            )}
             {exitError && <p className="error" role="alert">{exitError}</p>}
           </div>
         ) : (
           <div className="scan-result bad" role="alert">
             <h2>Chek faol emas</h2>
-            <p>{ticket.plate} {time(ticket.left_at)} da chiqib ketgan, {money(ticket.fee)} to'langan. Chek: {ticket.receipt_no}</p>
+            <p>{ticket.plate} {time(ticket.left_at)} da chiqib ketgan, {ticket.paid ? `${money(ticket.fee)} to'langan` : `to'lamagan, qarzi ${money(ticket.fee)}`}. Chek: {ticket.receipt_no}</p>
           </div>
         )}
         <button className="btn ghost" onClick={onClose}>Yopish</button>

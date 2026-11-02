@@ -80,10 +80,12 @@ app.get('/api/spots', async (req, res) => {
 app.get('/api/tariff', async (req, res) => res.json(await getTariff()));
 
 // ---------- 2. POST /api/enter — joy band, yangi sessiya ----------
-// spot_id berilmasa — keyingi bo'sh oddiy joy (ketma-ket to'ldirish)
+// spot_id berilmasa — keyingi bo'sh joy: blok to'lmaguncha keyingisiga o'tmaydi (id tartibi = B-01..B-40, C-01..).
+// Premium joy faqat mijoz xohlasa (premium: true) — oddiy mashina hech qachon avtomatik premiumga tushmaydi.
 app.post('/api/enter', async (req, res) => {
   const plate = normPlate(req.body?.plate);
   const spotId = req.body?.spot_id ? Number(req.body.spot_id) : null;
+  const premium = req.body?.premium === true;
   const db = await pool.connect();
   try {
     await db.query('BEGIN');
@@ -96,12 +98,16 @@ app.post('/api/enter', async (req, res) => {
           'UPDATE spots SET is_busy = true WHERE id = $1 AND NOT is_busy AND NOT is_disabled RETURNING *', [spotId])
       : await db.query(`
           UPDATE spots SET is_busy = true WHERE id = (
-            SELECT id FROM spots WHERE NOT is_busy AND NOT is_disabled
-            ORDER BY is_premium, id LIMIT 1 FOR UPDATE SKIP LOCKED)
-          RETURNING *`);
-    if (!spot.rows[0]) throw fail(409, spotId ? 'Bu joy band yoki yopiq' : "Bo'sh joy qolmadi");
+            SELECT id FROM spots WHERE NOT is_busy AND NOT is_disabled AND is_premium = $1
+            ORDER BY id LIMIT 1 FOR UPDATE SKIP LOCKED)
+          RETURNING *`, [premium]);
+    if (!spot.rows[0]) {
+      throw fail(409, spotId ? 'Bu joy band yoki yopiq' : premium ? "Bo'sh premium joy qolmadi" : "Bo'sh oddiy joy qolmadi");
+    }
 
     const s = spot.rows[0];
+    // Avval haydab chiqarilgan bo'lsa — to'lanmagan qarzi
+    const debt = await db.query('SELECT COALESCE(SUM(fee), 0)::int AS sum FROM sessions WHERE plate = $1 AND NOT paid', [plate]);
     const ins = await db.query(
       'INSERT INTO sessions (spot_id, plate, guard_in) VALUES ($1, $2, $3) RETURNING id, entered_at', [s.id, plate, req.user.id]);
     // Kirish cheki raqami = QR kod matni. Tasodifiy qism — har mashinaga boshqa, taxmin qilib bo'lmaydi.
@@ -109,9 +115,10 @@ app.post('/api/enter', async (req, res) => {
     const ticketNo = `T${entered_at.toISOString().slice(2, 10).replace(/-/g, '')}${String(id).padStart(5, '0')}-${crypto.randomBytes(3).toString('hex').toUpperCase()}`;
     await db.query('UPDATE sessions SET ticket_no = $2 WHERE id = $1', [id, ticketNo]);
     await db.query('COMMIT');
-    broadcast({ type: 'enter', plate, label: s.label, is_premium: s.is_premium, guard: req.user.full_name });
+    const debtSum = debt.rows[0].sum;
+    broadcast({ type: 'enter', plate, label: s.label, is_premium: s.is_premium, guard: req.user.full_name, debt: debtSum });
     const ticket = {
-      ticket_no: ticketNo, plate, label: s.label, spot_id: s.id, is_premium: s.is_premium,
+      ticket_no: ticketNo, plate, label: s.label, spot_id: s.id, is_premium: s.is_premium, debt: debtSum,
       entered_at, active: true, guard_in_name: req.user.full_name, tariff: await getTariff(),
     };
     res.status(201).json({ spot: s, ticket });
@@ -125,7 +132,11 @@ app.post('/api/enter', async (req, res) => {
 });
 
 // ---------- 3. PUT /api/exit/:spot_id — joy bo'sh, sessiya yopiladi, chek ----------
-app.put('/api/exit/:spot_id', async (req, res) => {
+// PUT /api/expel/:spot_id — mijoz to'lay olmadi: qorovul haydab chiqaradi, summa qarz bo'lib yoziladi
+app.put('/api/exit/:spot_id', (req, res) => closeSession(req, res, true));
+app.put('/api/expel/:spot_id', (req, res) => closeSession(req, res, false));
+
+async function closeSession(req, res, paid) {
   const db = await pool.connect();
   try {
     await db.query('BEGIN');
@@ -138,19 +149,19 @@ app.put('/api/exit/:spot_id', async (req, res) => {
 
     const tariff = await getTariff(db);
     const fee = calcFee(se.now - se.entered_at, tariff, se.is_premium);
-    const receiptNo = `CH-${se.now.toISOString().slice(0, 10).replace(/-/g, '')}-${String(se.id).padStart(5, '0')}`;
+    const receiptNo = `${paid ? 'CH' : 'QZ'}-${se.now.toISOString().slice(0, 10).replace(/-/g, '')}-${String(se.id).padStart(5, '0')}`;
     await db.query(
-      'UPDATE sessions SET left_at = $2, fee = $3, guard_out = $4, receipt_no = $5 WHERE id = $1',
-      [se.id, se.now, fee, req.user.id, receiptNo]);
+      'UPDATE sessions SET left_at = $2, fee = $3, guard_out = $4, receipt_no = $5, paid = $6 WHERE id = $1',
+      [se.id, se.now, fee, req.user.id, receiptNo, paid]);
     await db.query('UPDATE spots SET is_busy = false WHERE id = $1', [se.spot_id]);
     await db.query('COMMIT');
 
     const receipt = {
       receipt_no: receiptNo, ticket_no: se.ticket_no, plate: se.plate, label: se.label, is_premium: se.is_premium,
-      entered_at: se.entered_at, left_at: se.now, fee, guard_out_name: req.user.full_name,
+      entered_at: se.entered_at, left_at: se.now, fee, paid, guard_out_name: req.user.full_name,
       hours: Math.max(1, Math.ceil((se.now - se.entered_at) / 3600000)), tariff,
     };
-    broadcast({ type: 'exit', plate: se.plate, label: se.label, fee, guard: req.user.full_name });
+    broadcast({ type: paid ? 'exit' : 'expel', plate: se.plate, label: se.label, fee, guard: req.user.full_name });
     res.json(receipt);
   } catch (e) {
     await db.query('ROLLBACK');
@@ -158,22 +169,22 @@ app.put('/api/exit/:spot_id', async (req, res) => {
   } finally {
     db.release();
   }
-});
+}
 
 // ---------- 4. GET /api/revenue — bugungi tushum ----------
 app.get('/api/revenue', async (req, res) => {
   const { rows } = await pool.query(`
     SELECT COALESCE(SUM(fee), 0)::int AS total, count(*)::int AS count
-    FROM sessions WHERE left_at >= date_trunc('day', now())`);
+    FROM sessions WHERE left_at >= date_trunc('day', now()) AND paid`);
   res.json(rows[0]);
 });
 
 // ---------- Kirish chekini tekshirish (QR skaner) ----------
 // Chek raqami yoki mashina raqami. active = mashina hali ichkarida.
 app.get('/api/tickets/:code', async (req, res) => {
-  const code = String(req.params.code).toUpperCase().replace(/[s-]/g, '');
+  const code = String(req.params.code).toUpperCase().replace(/[\s-]/g, '');
   const { rows } = await pool.query(`
-    SELECT se.id, se.ticket_no, se.receipt_no, se.plate, se.entered_at, se.left_at, se.fee, se.spot_id,
+    SELECT se.id, se.ticket_no, se.receipt_no, se.plate, se.entered_at, se.left_at, se.fee, se.paid, se.spot_id,
            s.label, s.zone, s.is_premium, se.left_at IS NULL AS active, gi.full_name AS guard_in_name
     FROM sessions se JOIN spots s ON s.id = se.spot_id
     LEFT JOIN users gi ON gi.id = se.guard_in
@@ -187,7 +198,7 @@ app.get('/api/tickets/:code', async (req, res) => {
 app.get('/api/receipts', async (req, res) => {
   const { q = '', from = null, to = null } = req.query;
   const { rows } = await pool.query(`
-    SELECT se.id, se.receipt_no, se.ticket_no, se.plate, se.entered_at, se.left_at, se.fee,
+    SELECT se.id, se.receipt_no, se.ticket_no, se.plate, se.entered_at, se.left_at, se.fee, se.paid,
            s.label, s.is_premium, gi.full_name AS guard_in_name, go.full_name AS guard_out_name
     FROM sessions se
     JOIN spots s ON s.id = se.spot_id
@@ -215,15 +226,16 @@ app.get('/api/admin/stats', async (req, res) => {
     pool.query(`
       SELECT to_char(d, 'YYYY-MM-DD') AS day, COALESCE(SUM(se.fee), 0)::int AS total, count(se.id)::int AS count
       FROM generate_series(date_trunc('day', now()) - interval '6 days', date_trunc('day', now()), interval '1 day') d
-      LEFT JOIN sessions se ON se.left_at >= d AND se.left_at < d + interval '1 day'
+      LEFT JOIN sessions se ON se.left_at >= d AND se.left_at < d + interval '1 day' AND se.paid
       GROUP BY d ORDER BY d`),
     pool.query(`
       SELECT u.id, u.full_name, count(se.id)::int AS exits, COALESCE(SUM(se.fee), 0)::int AS total
       FROM users u
-      LEFT JOIN sessions se ON se.guard_out = u.id AND se.left_at >= date_trunc('day', now())
+      LEFT JOIN sessions se ON se.guard_out = u.id AND se.left_at >= date_trunc('day', now()) AND se.paid
       WHERE u.role = 'guard' GROUP BY u.id ORDER BY total DESC`),
     pool.query(`
-      SELECT COALESCE(SUM(fee), 0)::int AS total, count(*)::int AS count,
+      SELECT COALESCE(SUM(fee) FILTER (WHERE paid), 0)::int AS total, count(*)::int AS count,
+             COALESCE(SUM(fee) FILTER (WHERE NOT paid), 0)::int AS unpaid,
              COALESCE(round(avg(extract(epoch FROM left_at - entered_at)) / 60), 0)::int AS avg_minutes
       FROM sessions WHERE left_at >= date_trunc('day', now())`),
   ]);
@@ -306,6 +318,16 @@ app.delete('/api/admin/users/:id', async (req, res) => {
 app.use((err, req, res, next) => {
   if (!err.status) console.error(err);
   res.status(err.status || 500).json({ error: err.status ? err.message : 'Serverda xato' });
+});
+
+// Eski bazani yangilash (ma'lumot o'chmaydi): yangi ustunlar va tarif kalitlari
+await pool.query(`
+  ALTER TABLE sessions ADD COLUMN IF NOT EXISTS ticket_no TEXT UNIQUE;
+  ALTER TABLE sessions ADD COLUMN IF NOT EXISTS paid BOOLEAN NOT NULL DEFAULT true;
+  INSERT INTO settings VALUES ('premium_hour', 30000) ON CONFLICT (key) DO NOTHING;
+  DELETE FROM settings WHERE key = 'premium_mult';`).catch((e) => {
+  console.error(`Baza tayyor emas (${e.message}). Avval: npm run init-db`);
+  process.exit(1);
 });
 
 const port = process.env.PORT || 3000;

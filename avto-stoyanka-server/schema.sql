@@ -32,7 +32,8 @@ CREATE TABLE sessions (
   guard_in INTEGER REFERENCES users(id),
   guard_out INTEGER REFERENCES users(id),
   ticket_no TEXT UNIQUE,  -- kirish cheki (QR)
-  receipt_no TEXT UNIQUE  -- chiqish cheki
+  receipt_no TEXT UNIQUE, -- chiqish cheki (QZ- = to'lanmagan, haydalgan)
+  paid BOOLEAN NOT NULL DEFAULT true
 );
 -- Bitta joyda faqat bitta ochiq sessiya
 CREATE UNIQUE INDEX one_open_session ON sessions(spot_id) WHERE left_at IS NULL;

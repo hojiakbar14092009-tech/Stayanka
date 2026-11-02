@@ -22,6 +22,7 @@ export default function Receipt({ receipt: r, onClose }) {
           <article className="paper" id="print-receipt">
             <header>
               <b>AvtoStoyanka</b>
+              {r.paid === false && <span className="r-unpaid">To'lanmagan. Qarz</span>}
               <small>Toshkent, 24/7 qo'riqlanadi</small>
             </header>
             <p className="r-no">{r.receipt_no}</p>
@@ -40,7 +41,7 @@ export default function Receipt({ receipt: r, onClose }) {
                 {hours > rows.length && <li><span>…</span><span /></li>}
               </ol>
             )}
-            <p className="r-total"><span>Jami</span><span>{money(r.fee)}</span></p>
+            <p className="r-total"><span>{r.paid === false ? 'Qarz' : 'Jami'}</span><span>{money(r.fee)}</span></p>
             {r.ticket_no && <p className="r-guard">Kirish cheki {r.ticket_no} endi faol emas</p>}
             <p className="r-guard">Qorovul: {r.guard_out_name || '—'}</p>
             <p className="r-thanks">Yo'lingiz bexatar bo'lsin</p>

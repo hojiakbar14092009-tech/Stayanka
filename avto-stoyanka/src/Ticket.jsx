@@ -32,6 +32,7 @@ export default function Ticket({ ticket: t, onClose }) {
               <small>Kirish cheki. Chiqishda ko'rsating</small>
             </header>
             <p className={`t-status ${t.active ? 'on' : 'off'}`}>{t.active ? 'Faol' : 'Faol emas'}</p>
+            {t.debt > 0 && <p className="t-debt">Oldingi qarz: {money(t.debt)}</p>}
             <div className="t-spot">
               <small>Joyingiz</small>
               <b>{t.label}</b>

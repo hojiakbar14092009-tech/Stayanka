@@ -55,8 +55,8 @@ export default function App() {
 
   const notify = useCallback((text, kind = 'warn') => {
     const id = Math.random();
-    setToasts((t) => [...t.slice(-3), { id, text, kind }]);
-    setTimeout(() => setToasts((t) => t.filter((x) => x.id !== id)), 6000);
+    setToasts((t) => [...t.slice(-2), { id, text, kind }]);
+    setTimeout(() => setToasts((t) => t.filter((x) => x.id !== id)), 4500);
   }, []);
 
   // Sahifa ochilganda: spots, tushum va tarif
@@ -89,10 +89,13 @@ export default function App() {
       reload().catch(() => {});
       if (ev.type === 'enter') {
         setLastEvent(ev);
-        notify(`${ev.plate} ${ev.label} joyini band qildi${ev.is_premium ? ' (Premium)' : ''}. Qorovul: ${ev.guard}`, 'enter');
+        notify(`${ev.plate} → ${ev.label}${ev.is_premium ? ' (Premium)' : ''}${ev.debt ? `. Qarzi bor: ${money(ev.debt)}` : ''}`, ev.debt ? 'expel' : 'enter');
       } else if (ev.type === 'exit') {
         setLastEvent(ev);
-        notify(`${ev.plate} ${ev.label} joyidan chiqdi, ${money(ev.fee)}. Qorovul: ${ev.guard}`, 'exit');
+        notify(`${ev.plate} ${ev.label} joyidan chiqdi, ${money(ev.fee)}`, 'exit');
+      } else if (ev.type === 'expel') {
+        setLastEvent(ev);
+        notify(`${ev.plate} to'lamadi va haydab chiqarildi. Qarz: ${money(ev.fee)}`, 'expel');
       } else if (ev.type === 'tariff') {
         notify('Tarif yangilandi', 'info');
       }

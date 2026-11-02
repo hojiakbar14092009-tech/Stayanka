@@ -28,6 +28,7 @@ export function Overview({ spots, lastEvent }) {
         <div className="tile sign"><span>Bugungi tushum</span><b>{money(stats.today.total)}</b></div>
         <div className="tile"><span>Hozir ichkarida</span><b>{inside} <small>/ {open}</small></b></div>
         <div className="tile"><span>Bugun chiqqan</span><b>{stats.today.count}</b></div>
+        <div className="tile"><span>To'lanmagan (qarz)</span><b className="debt">{money(stats.today.unpaid)}</b></div>
         <div className="tile"><span>O'rtacha turish</span><b>{stats.today.avg_minutes} <small>daq</small></b></div>
       </div>
 

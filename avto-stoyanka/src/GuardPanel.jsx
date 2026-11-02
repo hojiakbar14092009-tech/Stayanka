@@ -1,5 +1,5 @@
 // Qorovul paneli: tepadan ko'rilgan stoyanka rejasi + o'ng tomonda qidiruv, darvoza, skaner va amal kartasi
-import { lazy, Suspense, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react';
 import { api, money, time, duration, calcFee, paintFor } from './api';
 import Receipt from './Receipt';
 import Ticket from './Ticket';
@@ -8,6 +8,12 @@ import ScanModal from './ScanModal';
 const ZONES = ['A', 'B', 'C', 'D', 'E'];
 // Three.js og'ir — alohida yuklanadi
 const Gate3D = lazy(() => import('./Gate3D'));
+// Sinov uchun tasodifiy O'zbekiston raqami: 01 A 123 BC
+const LETTERS = 'ABCDEFHKMNOPSTXYZ';
+const pickL = () => LETTERS[Math.floor(Math.random() * LETTERS.length)];
+const randomPlate = () =>
+  ['01', '10', '20', '25', '30', '40', '50', '60', '70', '75', '80', '85', '90', '95'][Math.floor(Math.random() * 14)] +
+  pickL() + String(Math.floor(Math.random() * 900) + 100) + pickL() + pickL();
 const norm = (v) => v.toUpperCase().replace(/[\s-]/g, '');
 
 // Joriy vaqt — jonli narx va turgan vaqt uchun har 20 soniyada yangilanadi
@@ -21,9 +27,9 @@ function useNow() {
 }
 
 // Tepadan ko'rilgan mashina
-function Car({ plate }) {
+function Car({ plate, leaving, onDone }) {
   return (
-    <svg className="car" viewBox="0 0 40 72" aria-hidden="true">
+    <svg className={leaving ? 'car leaving' : 'car'} onAnimationEnd={leaving ? onDone : undefined} viewBox="0 0 40 72" aria-hidden="true">
       <rect x="3" y="2" width="34" height="68" rx="11" fill={paintFor(plate)} />
       <path d="M8 22 Q20 14 32 22 L30 30 L10 30 Z" fill="#1b2430" />
       <rect x="10" y="31" width="20" height="20" rx="3" fill="rgba(0,0,0,.18)" />
@@ -36,44 +42,130 @@ function Car({ plate }) {
   );
 }
 
-function Stall({ spot, face, selected, found, washing, onPick }) {
+// Joy. Mashina yo'lakdan burilib kiradi; chiqqanda orqaga yurib, yo'lak bo'ylab ketadi (lane: r = o'ngga, l = chapga).
+function Stall({ spot, face, lane, selected, found, onPick }) {
   const state = spot.is_disabled ? 'off' : spot.is_busy ? 'busy' : 'free';
   const title = spot.is_disabled ? "ta'mirda" : spot.is_busy ? `band, ${spot.plate}` : "bo'sh";
+  // Chiqib ketayotgan mashinani animatsiya tugaguncha ko'rsatamiz
+  const [prev, setPrev] = useState({ busy: spot.is_busy, plate: spot.plate });
+  const [leaving, setLeaving] = useState(null);
+  if (prev.busy !== spot.is_busy || prev.plate !== spot.plate) {
+    if (prev.busy && !spot.is_busy) setLeaving(prev.plate);
+    setPrev({ busy: spot.is_busy, plate: spot.plate });
+  }
   return (
     <button
       data-spot={spot.id}
-      className={`stall ${face} ${state}${spot.is_premium ? ' premium' : ''}${selected ? ' selected' : ''}${found ? ' found' : ''}${washing ? ' washing' : ''}`}
+      className={`stall ${face} ${lane} ${state}${spot.is_premium ? ' premium' : ''}${selected ? ' selected' : ''}${found ? ' found' : ''}`}
       onClick={() => onPick(spot.id)}
       aria-label={`${spot.label}, ${title}`}
       aria-pressed={selected}
     >
       <span className="stall-no">{spot.label.slice(2)}</span>
       {spot.is_busy && <Car key={spot.session_id} plate={spot.plate} />}
+      {leaving && <Car key="out" plate={leaving} leaving onDone={() => setLeaving(null)} />}
       {spot.is_busy && <span className="stall-plate">{spot.plate}</span>}
       {found && <span className="pin" aria-hidden="true">▼</span>}
     </button>
   );
 }
 
-// Moykachi: premium zonadagi band mashinalarni navbat bilan yuvadi
-function Washer({ lot, targetId }) {
-  const [pos, setPos] = useState({ left: 8, top: 0 });
-  useLayoutEffect(() => {
-    const el = targetId && lot.current?.querySelector(`[data-spot="${targetId}"]`);
-    const lane = lot.current?.querySelector('.lane');
-    setPos(el
-      ? { left: el.offsetLeft + el.offsetWidth - 14, top: el.offsetTop + el.offsetHeight / 2 - 22 }
-      : { left: 8, top: (lane?.offsetTop ?? 0) + 8 });
-  }, [lot, targetId]);
+// Moykachi: faqat mashina turgan joyga boradi. Mashinalar orasidan emas — yo'lak va chetki yo'lakcha bo'ylab yuradi.
+const WALK_SPEED = 55; // px/s
+function Washer({ lot, dirtyIds }) {
+  const el = useRef(null);
+  const dirty = useRef(dirtyIds);
+  useEffect(() => { dirty.current = dirtyIds; }, [dirtyIds]);
+
+  useEffect(() => {
+    const lotEl = lot.current;
+    const me = el.current;
+    const speed = window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 1e6 : WALK_SPEED;
+    const lanes = () => [...lotEl.querySelectorAll('.lane')].map((l) => l.offsetTop + l.offsetHeight / 2);
+    const EDGE = 10; // zona chetidagi piyoda yo'lakcha
+    const st = { x: EDGE, y: lanes()[0], laneY: lanes()[0], path: [], target: null, wash: 0, face: 1, sway: 0 };
+
+    // Hozirgi joydan mashina yoniga yo'l: o'z yo'lagiga chiqadi → kerak bo'lsa chetdan boshqa yo'lakka → mashina yoniga
+    const routeTo = (x, y, laneY) => {
+      const p = [{ x: st.x, y: st.laneY }];
+      if (laneY !== st.laneY) p.push({ x: EDGE, y: st.laneY }, { x: EDGE, y: laneY });
+      p.push({ x, y: laneY }, { x, y });
+      st.path = p;
+      st.laneY = laneY;
+    };
+    const goWash = (id) => {
+      const s = lotEl.querySelector(`[data-spot="${id}"]`);
+      if (!s) return;
+      const ls = lanes();
+      const down = s.classList.contains('down');
+      const laneY = down ? ls.find((y) => y > s.offsetTop) : [...ls].reverse().find((y) => y < s.offsetTop);
+      // mashinaning yon tomoni, joyning ochiq qismiga yaqin
+      routeTo(s.offsetLeft + s.offsetWidth / 2 + 24, s.offsetTop + s.offsetHeight * (down ? 0.62 : 0.38), laneY);
+      st.target = id;
+      st.wash = 0;
+    };
+    const next = () => {
+      const ids = dirty.current;
+      if (!ids.length) {
+        const home = lanes()[0];
+        st.target = null;
+        if (st.x !== EDGE || st.y !== home) routeTo(EDGE, home, home);
+        return;
+      }
+      const i = ids.indexOf(st.target);
+      goWash(ids[(i + 1) % ids.length]);
+    };
+
+    let raf;
+    let last = performance.now();
+    const tick = (now) => {
+      const dt = Math.min(0.05, (now - last) / 1000);
+      last = now;
+      const ids = dirty.current;
+      if (st.target && !ids.includes(st.target)) next(); // mashina ketdi — boshqasiga
+      else if (!st.target && !st.path.length && ids.length) next();
+
+      let mode = 'idle';
+      if (st.path.length) {
+        const p = st.path[0];
+        const dx = p.x - st.x;
+        const dy = p.y - st.y;
+        const d = Math.hypot(dx, dy);
+        const step = speed * dt;
+        if (d <= step) {
+          st.x = p.x;
+          st.y = p.y;
+          st.path.shift();
+        } else {
+          st.x += (dx / d) * step;
+          st.y += (dy / d) * step;
+        }
+        if (Math.abs(dx) > 0.5) st.face = Math.sign(dx);
+        mode = 'walking';
+      } else if (st.target) {
+        st.face = -1; // mashinaga qarab
+        st.wash += dt;
+        st.sway = Math.sin(st.wash * 1.3) * 4; // mashina bo'ylab u yoq-bu yoqqa
+        mode = 'washing';
+        if (st.wash > 8 && ids.length > 1) next();
+      }
+      me.className = `washer ${mode}`;
+      me.style.transform = `translate(${st.x - 15 + (mode === 'washing' ? st.sway : 0)}px, ${st.y - 36}px) scaleX(${st.face})`;
+      raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, [lot]);
+
   return (
-    <div className={`washer${targetId ? ' at-work' : ''}`} style={pos} aria-hidden="true">
+    <div className="washer" ref={el} aria-hidden="true">
       <svg viewBox="0 0 32 44">
         <circle cx="16" cy="7" r="6" fill="#e8b98f" />
         <path d="M10 5 Q16 -1 22 5 Z" fill="#2257d6" />
         <rect x="9" y="13" width="14" height="16" rx="4" fill="#2257d6" />
         <rect x="9" y="17" width="14" height="3" fill="#f2c230" />
-        <rect x="10" y="29" width="5" height="12" rx="2" fill="#3a3d43" />
-        <rect x="17" y="29" width="5" height="12" rx="2" fill="#3a3d43" />
+        <rect className="leg-l" x="10" y="29" width="5" height="12" rx="2" fill="#3a3d43" />
+        <rect className="leg-r" x="17" y="29" width="5" height="12" rx="2" fill="#3a3d43" />
         <g className="washer-arm"><rect x="21" y="14" width="10" height="4" rx="2" fill="#2257d6" /><rect x="28" y="10" width="4" height="9" rx="1.5" fill="#f2c230" /></g>
       </svg>
       <span className="bubbles"><i /><i /><i /><i /></span>
@@ -85,34 +177,27 @@ function Washer({ lot, targetId }) {
 function LotMap({ spots, selectedId, foundIds, onPick }) {
   const lot = useRef(null);
   const premium = spots[0]?.is_premium;
-  const dirty = spots.filter((s) => s.is_premium && s.is_busy).map((s) => s.id);
-  const [washIdx, setWashIdx] = useState(0);
-  useEffect(() => {
-    if (!premium) return;
-    const t = setInterval(() => setWashIdx((i) => i + 1), 7000);
-    return () => clearInterval(t);
-  }, [premium]);
-  const washingId = premium && dirty.length ? dirty[washIdx % dirty.length] : null;
+  const dirtyIds = useMemo(() => spots.filter((s) => s.is_premium && s.is_busy).map((s) => s.id), [spots]);
 
   const rows = [0, 1, 2, 3].map((r) => spots.slice(r * 10, r * 10 + 10));
-  const row = (list, face) => (
+  const row = (list, face, lane) => (
     <div className="stall-row">
       {list.map((s) => (
-        <Stall key={s.id} spot={s} face={face} selected={s.id === selectedId} found={foundIds.has(s.id)} washing={s.id === washingId} onPick={onPick} />
+        <Stall key={s.id} spot={s} face={face} lane={lane} selected={s.id === selectedId} found={foundIds.has(s.id)} onPick={onPick} />
       ))}
     </div>
   );
   return (
     <div className="lot-scroll">
       <div className={`lot${premium ? ' covered' : ''}`} ref={lot}>
-        {row(rows[0], 'down')}
+        {row(rows[0], 'down', 'r')}
         <div className="lane"><span>⟶</span><span>⟶</span><span>⟶</span></div>
-        {row(rows[1], 'up')}
+        {row(rows[1], 'up', 'r')}
         <div className="curb">{premium && <span>Yopiq premium to'xtash joyi. Moykachi xizmatda</span>}</div>
-        {row(rows[2], 'down')}
+        {row(rows[2], 'down', 'l')}
         <div className="lane"><span>⟵</span><span>⟵</span><span>⟵</span></div>
-        {row(rows[3], 'up')}
-        {premium && <Washer lot={lot} targetId={washingId} />}
+        {row(rows[3], 'up', 'l')}
+        {premium && <Washer lot={lot} dirtyIds={dirtyIds} />}
       </div>
     </div>
   );
@@ -140,14 +225,26 @@ export default function GuardPanel({ spots, tariff, reload, lastEvent, notify })
   const [error, setError] = useState('');
   const [receipt, setReceipt] = useState(null);
   const [ticket, setTicket] = useState(null);
+  const [premium, setPremium] = useState(false); // mijoz premium joy so'radimi
+  const [arrival, setArrival] = useState(null); // kamera oldiga kelgan mashina
+  const [camRead, setCamRead] = useState('');
   const plateInput = useRef(null);
   const now = useNow();
 
   const selected = spots.find((s) => s.id === selectedId);
+  // Ketma-ket to'ldirish: blok to'lmaguncha keyingisiga o'tilmaydi; premium faqat mijoz xohlasa
   const nextFree = useMemo(
-    () => spots.filter((s) => !s.is_busy && !s.is_disabled).sort((a, b) => a.is_premium - b.is_premium || a.id - b.id)[0],
-    [spots]
+    () => spots.find((s) => !s.is_busy && !s.is_disabled && s.is_premium === premium),
+    [spots, premium]
   );
+
+  // Kamera raqamni o'qidi — maydonga yoziladi, qorovul faqat tekshirib "Kirgizish"ni bosadi
+  const plateRead = (p) => {
+    setPlate(p);
+    setCamRead(p);
+    setSelectedId(null);
+    plateInput.current?.focus();
+  };
   // Qidiruv: hamma 200 joy bo'ylab — raqam yoki chek raqami bo'yicha
   const term = norm(search);
   const matches = term.length >= 2
@@ -180,8 +277,13 @@ export default function GuardPanel({ spots, tariff, reload, lastEvent, notify })
     setBusy(true);
     setError('');
     try {
-      const { spot, ticket: t } = await api('/enter', { method: 'POST', body: { plate, spot_id: selected && !selected.is_busy ? selected.id : undefined } });
+      const { spot, ticket: t } = await api('/enter', {
+        method: 'POST',
+        body: { plate, premium, spot_id: selected && !selected.is_busy ? selected.id : undefined },
+      });
       setPlate('');
+      setCamRead('');
+      setPremium(false);
       setSelectedId(null);
       setZone(spot.zone);
       setTicket(t);
@@ -263,7 +365,12 @@ export default function GuardPanel({ spots, tariff, reload, lastEvent, notify })
           <button className="btn primary">Skaner</button>
         </form>
 
-        <Suspense fallback={<div className="gate" />}><Gate3D event={lastEvent} /></Suspense>
+        <Suspense fallback={<div className="gate" />}>
+          <Gate3D event={lastEvent} arrival={arrival} onPlateRead={plateRead} />
+        </Suspense>
+        <button className="btn ghost sm cam-demo" onClick={() => setArrival({ plate: randomPlate(), at: Date.now() })}>
+          Kamera oldiga mashina keldi (sinov)
+        </button>
 
         <div className="card action" key={selected?.id ?? 'quick'}>
           {selected?.is_disabled ? (
@@ -288,6 +395,13 @@ export default function GuardPanel({ spots, tariff, reload, lastEvent, notify })
               <h2>
                 {selected ? <>{selected.label} joyiga kirgizish</> : <>Keyingi bo'sh joy: <span className="next">{nextFree?.label ?? "yo'q"}</span></>}
               </h2>
+              {!selected && (
+                <div className="seg wide" role="group" aria-label="Joy turi — mijoz tanlaydi">
+                  <button type="button" className={premium ? '' : 'on'} onClick={() => setPremium(false)}>Oddiy joy</button>
+                  <button type="button" className={premium ? 'on gold-on' : ''} onClick={() => setPremium(true)}>Premium, yopiq</button>
+                </div>
+              )}
+              {camRead && plate === camRead && <p className="cam-hint">Kamera o'qidi. Raqamni tekshirib, kirgizing</p>}
               <input
                 ref={plateInput}
                 className="input plate-input"
@@ -301,7 +415,7 @@ export default function GuardPanel({ spots, tariff, reload, lastEvent, notify })
               <button className="btn primary big" disabled={busy || !plate.trim() || (!selected && !nextFree)}>Kirgizish va chek berish</button>
               {tariff && (
                 <p className="muted small">
-                  1-soat {firstHour(selected?.is_premium)}, har keyingi soat +{money(tariff.step_hour)}
+                  1-soat {firstHour(selected ? selected.is_premium : premium)}, har keyingi soat +{money(tariff.step_hour)}
                 </p>
               )}
             </form>
