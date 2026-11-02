@@ -393,7 +393,7 @@ function buildWorld(scene) {
   scene.add(box(40, 0.1, 2.2, mat(0x5b5e63), { y: 0.05, z: -3.6 }));
   scene.add(box(40, 0.08, 4, mat(0x3f5a3a, { roughness: 1 }), { y: 0.04, z: 4.6 }));
   const leaf = mat(0x47704a, { flatShading: true });
-  for (const [x, z, s] of [[-7, 4.2, 1], [6.5, 4.6, 1.2], [-3, 5.4, 0.8], [10, 3.8, 0.9]]) {
+  for (const [x, z, s] of [[-7, 4.2, 1], [9, 6.2, 1.1], [-3, 5.4, 0.8], [12, 4.4, 0.9]]) {
     scene.add(mesh(new THREE.CylinderGeometry(0.08, 0.12, 1.1, 8), mat(0x5a4030), { x, y: 0.55, z }));
     const crown = mesh(new THREE.IcosahedronGeometry(0.75 * s, 0), leaf, { x, y: 1.5 * s + 0.4, z });
     crown.rotation.set(x, z, 0);
@@ -673,3 +673,6 @@ export default function Gate3D({ event, arrival, reject, onPlateRead }) {
     </div>
   );
 }
+
+// WebGL sahnasi qisman yangilanishda (HMR) eskirib qolmasin — fayl o'zgarsa sahifa to'liq yangilanadi
+if (import.meta.hot) import.meta.hot.accept(() => window.location.reload());
