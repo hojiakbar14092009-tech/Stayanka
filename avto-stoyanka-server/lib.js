@@ -31,9 +31,8 @@ export function readToken(token) {
   return payload.exp > Date.now() ? payload : null;
 }
 
-// Har boshlangan soat avvalgisidan step_hour ga qimmat. Minimal 1 soat.
-export function calcFee(ms, { base_hour, step_hour, premium_mult }, isPremium) {
+// Har boshlangan soat avvalgisidan step_hour ga qimmat. Premium joyda 1-soat premium_hour. Minimal 1 soat.
+export function calcFee(ms, { base_hour, step_hour, premium_hour }, isPremium) {
   const h = Math.max(1, Math.ceil(ms / 3600000));
-  const total = h * base_hour + (step_hour * h * (h - 1)) / 2;
-  return Math.round(isPremium ? total * premium_mult : total);
+  return h * (isPremium ? premium_hour : base_hour) + (step_hour * h * (h - 1)) / 2;
 }

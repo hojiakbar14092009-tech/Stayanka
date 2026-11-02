@@ -27,7 +27,10 @@ Kirish: `admin / admin123`, qorovullar: `aziz / qorovul1`, `bekzod / qorovul2`, 
 
 - 5 zona × 40 = 200 joy, A zona — Premium
 - Raqamni yozib Enter: keyingi bo'sh joy avtomatik tanlanadi
-- Vaqt o'tgan sari narx oshadi: har keyingi soat qimmatroq
+- Vaqt o'tgan sari narx oshadi: har keyingi soat qimmatroq. Premium joy: 1-soat 30 000 so'm
+- Kirishda QR kodli chek (har mashinaga boshqa), chiqishda skanerlanadi; chek mashina chiqquncha faol
+- 200 joy bo'ylab mashinani topish, zonalar mini-xaritasi
+- Premium zona yopiq tom ostida, moykachi mashinalarni yuvadi; 3D qorovul personaji
 - Chiqishda chek printerdan chiqqandek animatsiya bilan chiqadi, arxivda saqlanadi
 - Mashina kirsa yoki chiqsa, hamma ochiq panelga xabar keladi va 3D darvoza ochiladi
 - Admin: statistika, joylarni ta'mirga yopish va premium qilish, tarif, qorovul profillari

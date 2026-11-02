@@ -17,26 +17,28 @@ Admin esa joylarni, tariflarni, qorovullarni va cheklar arxivini boshqaradi.
 users     id, username, password_hash, full_name, role ('admin'|'guard'), active
 spots     id, label (A-01..E-40), zone (A..E), is_premium, is_busy, is_disabled
 sessions  id, spot_id → spots.id, plate, entered_at, left_at, fee,
-          guard_in → users.id, guard_out → users.id, receipt_no
-settings  key, value   (tarif: base_hour, step_hour, premium_mult)
+          guard_in → users.id, guard_out → users.id,
+          ticket_no (kirish cheki, QR), receipt_no (chiqish cheki)
+settings  key, value   (tarif: base_hour, step_hour, premium_hour)
 ```
 
 - **200 joy**: 5 zona × 40 joy. A zona — **Premium** (yopiq, kamera, keng joy), narxi ko'paytiriladi.
 - Bitta joyda bir vaqtda faqat bitta ochiq sessiya bo'ladi (`left_at IS NULL` ga unique index).
-- Cheklar `sessions` jadvalining o'zida saqlanadi — chiqishda `receipt_no` beriladi, arxiv hech qachon o'chmaydi.
+- Kirishda **QR kodli kirish cheki** beriladi: `T26110200038-9EB053` ko'rinishida, oxiridagi tasodifiy qism tufayli har mashinaning QR kodi boshqacha. Mashina ichkarida ekan chek **faol**, chiqqach **faol emas**.
+- Chiqishda `receipt_no` (chiqish cheki) beriladi. Ikkala chek ham `sessions` jadvalida saqlanadi, arxiv o'chmaydi.
 
 ## 3. Narx — vaqt o'tgan sari oshadi
 
 Har boshlangan soat avvalgisidan qimmatroq:
 
 ```
-n-soat narxi = base_hour + (n - 1) × step_hour
-Jami (h soat) = h × base_hour + step_hour × h × (h - 1) / 2
-Premium joy   = Jami × premium_mult
+n-soat narxi  = boshlang'ich + (n - 1) × step_hour
+boshlang'ich  = base_hour (oddiy) yoki premium_hour (premium)
+Jami (h soat) = h × boshlang'ich + step_hour × h × (h - 1) / 2
 ```
 
-Standart: `base_hour = 5000`, `step_hour = 1000`, `premium_mult = 2`.
-Misol: 3 soat → 5000 + 6000 + 7000 = **18 000 so'm**; premiumda 36 000.
+Standart: `base_hour = 5000`, `step_hour = 1000`, `premium_hour = 30000`.
+Misol: 3 soat → 5000 + 6000 + 7000 = **18 000 so'm**; premiumda 30 000 + 31 000 + 32 000 = **93 000 so'm**.
 Minimal — 1 soat. Admin tarifni paneldan o'zgartiradi.
 
 ## 4. API
@@ -46,6 +48,7 @@ Minimal — 1 soat. Admin tarifni paneldan o'zgartiradi.
 | POST | `/api/login` | hamma | `{username, password}` → token |
 | GET | `/api/spots` | qorovul | 200 joy, id tartibida, ochiq sessiya bilan |
 | POST | `/api/enter` | qorovul | `{spot_id?, plate}` — joy band, yangi sessiya. `spot_id` bo'lmasa keyingi bo'sh joy |
+| GET | `/api/tickets/:code` | qorovul | QR chek yoki mashina raqami bo'yicha: chek faolmi, qaysi joyda, hozirgi narx |
 | PUT | `/api/exit/:spot_id` | qorovul | joy bo'sh, sessiya yopiladi, narx hisoblanadi, chek qaytadi |
 | GET | `/api/revenue` | qorovul | bugungi tushum (SUM) |
 | GET | `/api/receipts` | qorovul | cheklar arxivi (`q`, `from`, `to`) |
@@ -88,6 +91,12 @@ Harakat (faqat amalga javoban):
 - `prefers-reduced-motion` — animatsiyalar o'chadi.
 
 ## 7. Qorovul uchun qulayliklar
+
+- Kirishda QR kodli chek chop etiladi (joy raqami katta yozilgan).
+- Chiqishda chek skanerlanadi: lazer animatsiyasi, keyin «Chek faol» va to'lov summasi. Qayta skanerlansa — «Chek faol emas». USB QR skaner ham ishlaydi: u kodni yozib Enter bosadi.
+- Mashinani topish: raqamning istalgan qismi yoki chek raqami bo'yicha 200 joy bo'ylab qidiradi. Har zona tabida 40 nuqtali mini-xarita bor, topilgan mashina sariq yonadi, rejada ustida ko'rsatkich chiqadi.
+- A zona — yopiq tom ostida, moykachi band mashinalarni navbat bilan yuvadi.
+- 3D darvozada qorovul personaji turadi va kirgan mashinaga qo'l ko'taradi.
 
 - Raqamni yozib **Enter** — tizim keyingi bo'sh joyni o'zi tanlaydi (ketma-ket to'ldirish).
 - Joyni bosish — kirgizish yoki chiqarish.

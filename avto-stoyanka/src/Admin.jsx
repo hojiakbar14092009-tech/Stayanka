@@ -143,7 +143,7 @@ export function TariffAdmin({ tariff, reload }) {
         <h2>Tarif</h2>
         <label>1-soat narxi, so'm<input className="input" type="number" min="0" step="500" value={form.base_hour} onChange={set('base_hour')} /></label>
         <label>Har keyingi soatga qo'shiladi, so'm<input className="input" type="number" min="0" step="500" value={form.step_hour} onChange={set('step_hour')} /></label>
-        <label>Premium ko'paytmasi<input className="input" type="number" min="1" max="10" value={form.premium_mult} onChange={set('premium_mult')} /></label>
+        <label>Premium joy, 1-soat narxi, so'm<input className="input" type="number" min="0" step="1000" value={form.premium_hour} onChange={set('premium_hour')} /></label>
         <button className="btn primary">Tarifni saqlash</button>
         {msg && <p className="muted" role="status">{msg}</p>}
       </form>

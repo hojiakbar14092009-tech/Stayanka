@@ -1,4 +1,5 @@
 // AvtoStoyanka API: Express + PostgreSQL (pg Pool). Port 3000.
+import crypto from 'node:crypto';
 import express from 'express';
 import cors from 'cors';
 import pg from 'pg';
@@ -68,7 +69,7 @@ app.get('/api/events', (req, res) => {
 app.get('/api/spots', async (req, res) => {
   const { rows } = await pool.query(`
     SELECT s.id, s.label, s.zone, s.is_premium, s.is_busy, s.is_disabled,
-           se.id AS session_id, se.plate, se.entered_at, u.full_name AS guard_name
+           se.id AS session_id, se.plate, se.entered_at, se.ticket_no, u.full_name AS guard_name
     FROM spots s
     LEFT JOIN sessions se ON se.spot_id = s.id AND se.left_at IS NULL
     LEFT JOIN users u ON u.id = se.guard_in
@@ -101,11 +102,19 @@ app.post('/api/enter', async (req, res) => {
     if (!spot.rows[0]) throw fail(409, spotId ? 'Bu joy band yoki yopiq' : "Bo'sh joy qolmadi");
 
     const s = spot.rows[0];
-    const { rows } = await db.query(
-      'INSERT INTO sessions (spot_id, plate, guard_in) VALUES ($1, $2, $3) RETURNING *', [s.id, plate, req.user.id]);
+    const ins = await db.query(
+      'INSERT INTO sessions (spot_id, plate, guard_in) VALUES ($1, $2, $3) RETURNING id, entered_at', [s.id, plate, req.user.id]);
+    // Kirish cheki raqami = QR kod matni. Tasodifiy qism — har mashinaga boshqa, taxmin qilib bo'lmaydi.
+    const { id, entered_at } = ins.rows[0];
+    const ticketNo = `T${entered_at.toISOString().slice(2, 10).replace(/-/g, '')}${String(id).padStart(5, '0')}-${crypto.randomBytes(3).toString('hex').toUpperCase()}`;
+    await db.query('UPDATE sessions SET ticket_no = $2 WHERE id = $1', [id, ticketNo]);
     await db.query('COMMIT');
     broadcast({ type: 'enter', plate, label: s.label, is_premium: s.is_premium, guard: req.user.full_name });
-    res.status(201).json({ spot: s, session: rows[0] });
+    const ticket = {
+      ticket_no: ticketNo, plate, label: s.label, spot_id: s.id, is_premium: s.is_premium,
+      entered_at, active: true, guard_in_name: req.user.full_name, tariff: await getTariff(),
+    };
+    res.status(201).json({ spot: s, ticket });
   } catch (e) {
     await db.query('ROLLBACK');
     if (e.code === '23505') throw fail(409, 'Bu joy hozirgina band qilindi');
@@ -137,7 +146,7 @@ app.put('/api/exit/:spot_id', async (req, res) => {
     await db.query('COMMIT');
 
     const receipt = {
-      receipt_no: receiptNo, plate: se.plate, label: se.label, is_premium: se.is_premium,
+      receipt_no: receiptNo, ticket_no: se.ticket_no, plate: se.plate, label: se.label, is_premium: se.is_premium,
       entered_at: se.entered_at, left_at: se.now, fee, guard_out_name: req.user.full_name,
       hours: Math.max(1, Math.ceil((se.now - se.entered_at) / 3600000)), tariff,
     };
@@ -159,18 +168,34 @@ app.get('/api/revenue', async (req, res) => {
   res.json(rows[0]);
 });
 
+// ---------- Kirish chekini tekshirish (QR skaner) ----------
+// Chek raqami yoki mashina raqami. active = mashina hali ichkarida.
+app.get('/api/tickets/:code', async (req, res) => {
+  const code = String(req.params.code).toUpperCase().replace(/[s-]/g, '');
+  const { rows } = await pool.query(`
+    SELECT se.id, se.ticket_no, se.receipt_no, se.plate, se.entered_at, se.left_at, se.fee, se.spot_id,
+           s.label, s.zone, s.is_premium, se.left_at IS NULL AS active, gi.full_name AS guard_in_name
+    FROM sessions se JOIN spots s ON s.id = se.spot_id
+    LEFT JOIN users gi ON gi.id = se.guard_in
+    WHERE replace(se.ticket_no, '-', '') = $1 OR se.plate = $1
+    ORDER BY (replace(se.ticket_no, '-', '') = $1) DESC, se.left_at IS NULL DESC, se.entered_at DESC LIMIT 1`, [code]);
+  if (!rows[0]) throw fail(404, "Bunday chek topilmadi");
+  res.json({ ...rows[0], tariff: await getTariff() });
+});
+
 // ---------- Cheklar arxivi ----------
 app.get('/api/receipts', async (req, res) => {
   const { q = '', from = null, to = null } = req.query;
   const { rows } = await pool.query(`
-    SELECT se.id, se.receipt_no, se.plate, se.entered_at, se.left_at, se.fee,
+    SELECT se.id, se.receipt_no, se.ticket_no, se.plate, se.entered_at, se.left_at, se.fee,
            s.label, s.is_premium, gi.full_name AS guard_in_name, go.full_name AS guard_out_name
     FROM sessions se
     JOIN spots s ON s.id = se.spot_id
     LEFT JOIN users gi ON gi.id = se.guard_in
     LEFT JOIN users go ON go.id = se.guard_out
     WHERE se.left_at IS NOT NULL
-      AND ($1 = '' OR se.plate ILIKE '%' || $1 || '%' OR se.receipt_no ILIKE '%' || $1 || '%')
+      AND ($1 = '' OR se.plate ILIKE '%' || $1 || '%' OR replace(se.receipt_no, '-', '') ILIKE '%' || $1 || '%'
+           OR replace(se.ticket_no, '-', '') ILIKE '%' || $1 || '%')
       AND ($2::date IS NULL OR se.left_at >= $2::date)
       AND ($3::date IS NULL OR se.left_at < $3::date + 1)
     ORDER BY se.left_at DESC LIMIT 300`, [String(q).trim().replace(/[\s-]/g, ''), from || null, to || null]);
@@ -219,7 +244,7 @@ app.put('/api/admin/spots/:id', async (req, res) => {
 app.get('/api/admin/settings', async (req, res) => res.json(await getTariff()));
 
 app.put('/api/admin/settings', async (req, res) => {
-  for (const key of ['base_hour', 'step_hour', 'premium_mult']) {
+  for (const key of ['base_hour', 'step_hour', 'premium_hour']) {
     const v = Number(req.body?.[key]);
     if (!Number.isInteger(v) || v < 0 || v > 10_000_000) throw fail(400, `${key} — musbat butun son bo'lsin`);
     await pool.query('UPDATE settings SET value = $2 WHERE key = $1', [key, v]);

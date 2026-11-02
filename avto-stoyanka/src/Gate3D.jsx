@@ -39,6 +39,43 @@ function buildCar() {
   return car;
 }
 
+// Qorovul: forma, aks ettiruvchi jilet, furajka. O'ng qo'li yelkadan aylanadi (salom beradi).
+function buildGuard() {
+  const g = new THREE.Group();
+  const skin = 0xe8b98f;
+  for (const z of [0.11, -0.11]) {
+    const leg = box(0.16, 0.75, 0.18, 0x2a3140);
+    leg.position.set(0, 0.375, z);
+    const boot = box(0.26, 0.1, 0.2, 0x15171a);
+    boot.position.set(0.04, 0.05, z);
+    g.add(leg, boot);
+  }
+  const torso = box(0.3, 0.7, 0.5, 0x2257d6);
+  torso.position.y = 1.1;
+  const vest = box(0.32, 0.12, 0.52, 0xf2c230, { emissive: 0xf2c230, emissiveIntensity: 0.25 });
+  vest.position.y = 1.15;
+  const head = new THREE.Mesh(new THREE.SphereGeometry(0.17, 20, 16), new THREE.MeshStandardMaterial({ color: skin }));
+  head.position.y = 1.65;
+  head.castShadow = true;
+  const cap = new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.19, 0.1, 20), new THREE.MeshStandardMaterial({ color: 0x1b2a55 }));
+  cap.position.y = 1.78;
+  const visor = box(0.16, 0.03, 0.3, 0x15171a);
+  visor.position.set(0.16, 1.74, 0);
+  const leftArm = box(0.13, 0.6, 0.13, 0x2257d6);
+  leftArm.position.set(0, 1.12, -0.32);
+  // o'ng qo'l yelkadan aylanadi
+  const shoulder = new THREE.Group();
+  shoulder.position.set(0, 1.4, 0.32);
+  const rightArm = box(0.13, 0.6, 0.13, 0x2257d6);
+  rightArm.position.y = -0.28;
+  const hand = new THREE.Mesh(new THREE.SphereGeometry(0.07, 12, 10), new THREE.MeshStandardMaterial({ color: skin }));
+  hand.position.y = -0.6;
+  shoulder.add(rightArm, hand);
+  g.add(torso, vest, head, cap, visor, leftArm, shoulder);
+  g.userData.shoulder = shoulder;
+  return g;
+}
+
 export default function Gate3D({ event }) {
   const mount = useRef(null);
   const scene3d = useRef(null);
@@ -110,6 +147,12 @@ export default function Gate3D({ event }) {
     }
     scene.add(post, pivot);
 
+    const guard = buildGuard();
+    guard.position.set(2.3, 0, -2.55);
+    guard.scale.setScalar(1.15);
+    guard.rotation.y = -Math.PI / 2; // yo'lga qarab turadi
+    scene.add(guard);
+
     const car = buildCar();
     car.visible = false;
     scene.add(car);
@@ -124,7 +167,7 @@ export default function Gate3D({ event }) {
     const ro = new ResizeObserver(resize);
     ro.observe(el);
 
-    scene3d.current = { renderer, scene, camera, car, pivot, raf: 0 };
+    scene3d.current = { renderer, scene, camera, car, pivot, guard, raf: 0 };
     return () => {
       cancelAnimationFrame(scene3d.current.raf);
       ro.disconnect();
@@ -137,7 +180,7 @@ export default function Gate3D({ event }) {
   useEffect(() => {
     const s = scene3d.current;
     if (!s || !event) return;
-    const { renderer, scene, camera, car, pivot } = s;
+    const { renderer, scene, camera, car, pivot, guard } = s;
     const out = event.type === 'exit';
     car.userData.body.material.color.set(paintFor(event.plate));
     car.visible = true;
@@ -152,6 +195,9 @@ export default function Gate3D({ event }) {
       const drive2 = clamp01((t - 1.6) / 1.4) ** 1.6;
       car.position.set(t < 1.6 ? from + (stopAt - from) * drive1 : stopAt + (to - stopAt) * drive2, 0, z);
       pivot.rotation.x = -lift * (Math.PI / 2.1);
+      // Qorovul mashinaga qaraydi va salom beradi
+      guard.rotation.y = Math.atan2(-(car.position.z - guard.position.z), car.position.x - guard.position.x);
+      guard.userData.shoulder.rotation.z = lift * (Math.PI * 0.85) + Math.sin(t * 12) * 0.25 * lift;
       renderer.render(scene, camera);
     };
 

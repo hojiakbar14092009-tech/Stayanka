@@ -12,7 +12,7 @@ export default function Receipt({ receipt: r, onClose }) {
   const ms = new Date(r.left_at) - new Date(r.entered_at);
   const hours = r.hours || Math.max(1, Math.ceil(ms / 3600000));
   // Soatma-soat taqsimot faqat chiqish paytida (tarif ma'lum bo'lganda)
-  const rows = r.tariff ? Array.from({ length: Math.min(hours, 24) }, (_, i) => r.tariff.base_hour + i * r.tariff.step_hour) : [];
+  const rows = r.tariff ? Array.from({ length: Math.min(hours, 24) }, (_, i) => (r.is_premium ? r.tariff.premium_hour : r.tariff.base_hour) + i * r.tariff.step_hour) : [];
 
   return (
     <div className="overlay" onClick={onClose} role="dialog" aria-modal="true" aria-label="Chek">
@@ -38,10 +38,10 @@ export default function Receipt({ receipt: r, onClose }) {
                   <li key={i}><span>{i + 1}-soat</span><span>{money(fee)}</span></li>
                 ))}
                 {hours > rows.length && <li><span>…</span><span /></li>}
-                {r.is_premium && <li><span>Premium</span><span>× {r.tariff.premium_mult}</span></li>}
               </ol>
             )}
             <p className="r-total"><span>Jami</span><span>{money(r.fee)}</span></p>
+            {r.ticket_no && <p className="r-guard">Kirish cheki {r.ticket_no} endi faol emas</p>}
             <p className="r-guard">Qorovul: {r.guard_out_name || '—'}</p>
             <p className="r-thanks">Yo'lingiz bexatar bo'lsin</p>
           </article>

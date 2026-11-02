@@ -22,7 +22,7 @@ export default function Archive() {
   return (
     <section className="archive">
       <div className="archive-filters">
-        <input className="input" placeholder="Raqam yoki chek raqami" value={q} onChange={(e) => setQ(e.target.value)} aria-label="Qidiruv" />
+        <input className="input" placeholder="Mashina, chek yoki kirish cheki raqami" value={q} onChange={(e) => setQ(e.target.value)} aria-label="Qidiruv" />
         <label>Dan <input className="input" type="date" value={from} onChange={(e) => setFrom(e.target.value)} /></label>
         <label>Gacha <input className="input" type="date" value={to} onChange={(e) => setTo(e.target.value)} /></label>
         <p className="archive-sum">{list.length} ta chek, jami <b>{money(total)}</b></p>
@@ -34,12 +34,13 @@ export default function Archive() {
         <div className="table-wrap">
           <table className="table">
             <thead>
-              <tr><th>Chek</th><th>Raqam</th><th>Joy</th><th>Kirdi</th><th>Chiqdi</th><th>Qorovul</th><th className="num">Summa</th></tr>
+              <tr><th>Chek</th><th>Kirish cheki</th><th>Raqam</th><th>Joy</th><th>Kirdi</th><th>Chiqdi</th><th>Qorovul</th><th className="num">Summa</th></tr>
             </thead>
             <tbody>
               {list.map((r) => (
                 <tr key={r.id} onClick={() => setOpen(r)} tabIndex={0} onKeyDown={(e) => e.key === 'Enter' && setOpen(r)}>
                   <td className="mono">{r.receipt_no}</td>
+                  <td className="mono muted">{r.ticket_no || '—'}</td>
                   <td><span className="plate sm">{r.plate}</span></td>
                   <td>{r.label}{r.is_premium && <span className="gold"> P+</span>}</td>
                   <td>{dateTime(r.entered_at)}</td>

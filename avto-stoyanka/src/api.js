@@ -32,8 +32,7 @@ export function duration(ms) {
 // Server lib.js dagi calcFee bilan bir xil — jonli narxni ko'rsatish uchun
 export function calcFee(ms, t, isPremium) {
   const h = Math.max(1, Math.ceil(ms / 3600000));
-  const total = h * t.base_hour + (t.step_hour * h * (h - 1)) / 2;
-  return Math.round(isPremium ? total * t.premium_mult : total);
+  return h * (isPremium ? t.premium_hour : t.base_hour) + (t.step_hour * h * (h - 1)) / 2;
 }
 
 // Raqamdan doimiy mashina rangi

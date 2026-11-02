@@ -31,7 +31,8 @@ CREATE TABLE sessions (
   fee INTEGER,
   guard_in INTEGER REFERENCES users(id),
   guard_out INTEGER REFERENCES users(id),
-  receipt_no TEXT UNIQUE
+  ticket_no TEXT UNIQUE,  -- kirish cheki (QR)
+  receipt_no TEXT UNIQUE  -- chiqish cheki
 );
 -- Bitta joyda faqat bitta ochiq sessiya
 CREATE UNIQUE INDEX one_open_session ON sessions(spot_id) WHERE left_at IS NULL;
@@ -39,7 +40,7 @@ CREATE INDEX sessions_left_at ON sessions(left_at);
 
 -- Tarif
 CREATE TABLE settings (key TEXT PRIMARY KEY, value INTEGER NOT NULL);
-INSERT INTO settings VALUES ('base_hour', 5000), ('step_hour', 1000), ('premium_mult', 2);
+INSERT INTO settings VALUES ('base_hour', 5000), ('step_hour', 1000), ('premium_hour', 30000);
 
 INSERT INTO spots (label, zone, is_premium)
 SELECT z || '-' || lpad(n::text, 2, '0'), z, z = 'A'

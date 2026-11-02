@@ -128,7 +128,6 @@ label { display: grid; gap: .3rem; font-size: .9rem; color: var(--paint-dim); }
 .zone-tab b { grid-row: span 2; font: 800 2.2rem/1 var(--display); }
 .zone-tab span { font-size: .8rem; color: var(--paint-dim); }
 .zone-tab em { font-style: normal; font-family: var(--display); font-weight: 700; color: var(--green); }
-.zone-tab i { position: absolute; left: 0; bottom: 0; height: 4px; width: var(--fill); background: var(--red); transition: width .4s; }
 .zone-tab.on { border-color: var(--paint); }
 .zone-tab.premium b { color: var(--yellow); }
 
@@ -322,7 +321,7 @@ label { display: grid; gap: .3rem; font-size: .9rem; color: var(--paint-dim); }
 
 /* ---------- Moslashuv ---------- */
 @media (max-width: 1100px) {
-  .guard { grid-template-columns: 1fr; }
+  .guard { grid-template-columns: minmax(0, 1fr); }
   .dock { position: static; grid-row: 1; }
   .panels { grid-template-columns: 1fr; }
   .panels.two { grid-template-columns: 1fr; }
@@ -351,3 +350,104 @@ label { display: grid; gap: .3rem; font-size: .9rem; color: var(--paint-dim); }
   #print-receipt, #print-receipt * { visibility: visible; }
   #print-receipt { position: absolute; left: 0; top: 0; width: 80mm; animation: none; -webkit-mask: none; mask: none; }
 }
+
+/* ---------- Zona tabidagi mini-xarita ---------- */
+.mini { grid-column: 1 / -1; display: grid; grid-template-columns: repeat(10, 1fr); gap: 2px; margin-top: .45rem; }
+.mini i { aspect-ratio: 1; border-radius: 1px; background: rgba(47, 182, 121, .55); }
+.mini i.busy { background: var(--red); }
+.mini i.off { background: var(--yellow); opacity: .5; }
+.mini i.hit { background: var(--yellow); box-shadow: 0 0 6px var(--yellow); animation: blink .8s steps(2) infinite; }
+.zone-tab.has-hit { border-color: var(--yellow); }
+.zone-tab.has-hit em { color: var(--yellow); }
+@keyframes blink { 50% { opacity: .3; } }
+
+/* Topilgan mashina ustida ko'rsatkich */
+.pin {
+  position: absolute; top: -20px; left: 50%; translate: -50% 0; z-index: 3; color: var(--yellow);
+  font-size: 1.4rem; text-shadow: 0 2px 4px rgba(0, 0, 0, .6); animation: pin .7s ease-in-out infinite alternate;
+}
+.stall.up .pin { top: auto; bottom: -20px; rotate: 180deg; }
+@keyframes pin { to { transform: translateY(-6px); } }
+
+/* Qidiruv natijalari va skaner maydoni */
+.finder { display: grid; gap: .4rem; }
+.results { list-style: none; margin: 0; padding: 0; display: grid; gap: .3rem; }
+.results button {
+  width: 100%; display: grid; grid-template-columns: auto auto 1fr; gap: .7rem; align-items: center; text-align: left;
+  background: var(--asphalt-deep); border: 2px solid transparent; border-radius: 7px; padding: .4rem .6rem;
+}
+.results button:hover { border-color: var(--yellow); }
+.results b { font: 800 1.3rem var(--display); color: var(--yellow); }
+.results .muted { margin: 0; text-align: right; font-size: .85rem; }
+.scan-form { display: grid; grid-template-columns: 1fr auto; gap: .5rem; }
+
+/* ---------- Premium: yopiq tom ---------- */
+.lot { position: relative; }
+.lot.covered .stall-row { position: relative; }
+.lot.covered .stall-row::after {
+  content: ''; position: absolute; inset: -6px -10px; pointer-events: none; z-index: 2; border-radius: 4px;
+  /* polikarbonat tom: tirgak to'sinlari va yarim shaffof panel */
+  background:
+    repeating-linear-gradient(90deg, rgba(200, 210, 225, .32) 0 3px, transparent 3px 10%),
+    linear-gradient(180deg, rgba(160, 190, 230, .16), rgba(160, 190, 230, .07));
+  border: 2px solid rgba(200, 210, 225, .35);
+}
+.curb { display: grid; place-items: center; }
+.lot.covered .curb { height: 26px; }
+.curb span { font: 600 .85rem var(--display); color: var(--yellow); letter-spacing: .03em; }
+
+/* Moykachi */
+.washer { position: absolute; z-index: 4; width: 30px; transition: left 2.6s ease-in-out, top 2.6s ease-in-out; pointer-events: none; }
+.washer svg { display: block; width: 30px; animation: walk .4s ease-in-out infinite alternate; filter: drop-shadow(0 3px 2px rgba(0, 0, 0, .5)); }
+.washer.at-work .washer-arm { transform-origin: 21px 16px; animation: scrub .35s ease-in-out infinite alternate; }
+@keyframes walk { to { transform: translateY(-2px) rotate(3deg); } }
+@keyframes scrub { from { transform: rotate(-25deg); } to { transform: rotate(20deg); } }
+.bubbles { position: absolute; left: -22px; top: 6px; width: 30px; height: 40px; }
+.washer:not(.at-work) .bubbles { display: none; }
+.bubbles i {
+  position: absolute; bottom: 0; width: 9px; height: 9px; border-radius: 50%;
+  background: radial-gradient(circle at 30% 30%, #fff, rgba(190, 225, 255, .5)); animation: bubble 1.6s ease-out infinite;
+}
+.bubbles i:nth-child(2) { left: 10px; animation-delay: .4s; width: 6px; height: 6px; }
+.bubbles i:nth-child(3) { left: 4px; animation-delay: .8s; }
+.bubbles i:nth-child(4) { left: 16px; animation-delay: 1.2s; width: 7px; height: 7px; }
+@keyframes bubble { from { transform: translateY(0) scale(.4); opacity: 1; } to { transform: translateY(-38px) scale(1.2); opacity: 0; } }
+.stall.washing .car { animation: shine 1.4s ease-in-out infinite alternate; }
+@keyframes shine { to { filter: drop-shadow(0 4px 3px rgba(0, 0, 0, .45)) brightness(1.25) saturate(1.2); } }
+
+/* ---------- Kirish cheki ---------- */
+.ticket { display: grid; justify-items: center; }
+.ticket header, .ticket dl, .ticket .r-plate { width: 100%; }
+.t-status { font: 800 1rem var(--display); letter-spacing: .08em; padding: .1rem .8rem; border-radius: 99px; }
+.t-status.on { background: #1f9a63; color: #fff; animation: live 1.6s ease-in-out infinite; }
+.t-status.off { background: #ccc; color: #555; text-decoration: line-through; }
+@keyframes live { 50% { box-shadow: 0 0 0 6px rgba(47, 182, 121, .25); } }
+.t-spot { display: grid; justify-items: center; line-height: 1; margin: .3rem 0 .6rem; }
+.t-spot small { color: #666; }
+.t-spot b { font: 800 3.4rem var(--display); }
+.t-spot em { font-style: normal; font-weight: 700; color: #a57c00; }
+.qr svg { display: block; width: 100%; height: 100%; }
+
+/* ---------- Skaner ---------- */
+.scanner { width: min(400px, 100%); display: grid; gap: .8rem; background: var(--asphalt-deep); border-radius: 12px; padding: 1.2rem; border-top: 5px solid var(--blue); }
+.scan-bed { position: relative; height: 210px; border-radius: 10px; overflow: hidden; background: #1a1c20; display: grid; place-items: center; }
+.scan-ticket {
+  display: grid; justify-items: center; gap: .3rem; background: #fbfaf6; color: #1d1f22; padding: .7rem .7rem .5rem;
+  border-radius: 4px; font-size: .72rem; animation: feed .6s cubic-bezier(.2, .8, .3, 1);
+}
+@keyframes feed { from { transform: translateY(120%) rotate(-6deg); } }
+.scan-head { position: absolute; inset: 0; pointer-events: none; }
+.laser {
+  position: absolute; left: 8%; right: 8%; height: 3px; top: 10%; background: #ff3b3b;
+  box-shadow: 0 0 10px 3px rgba(255, 59, 59, .7), 0 0 40px 12px rgba(255, 59, 59, .2);
+  animation: sweep .85s ease-in-out .5s 2 alternate both;
+}
+@keyframes sweep { to { top: 88%; } }
+.scan-bed.done .laser { opacity: 0; transition: opacity .2s; }
+.scan-bed.done::after { content: ''; position: absolute; inset: 0; border: 4px solid var(--green); border-radius: 10px; animation: fade .3s; }
+.scan-msg { margin: 0; text-align: center; font: 700 1.2rem var(--display); color: var(--paint-dim); }
+.scan-result { display: grid; gap: .3rem; animation: rise .25s ease-out; }
+.scan-result.ok h2 { color: var(--green); }
+.scan-result.bad h2 { color: #ff8f92; }
+.scan-result p { margin: 0; }
+.scan-bed.bad::after { border-color: var(--red); }
