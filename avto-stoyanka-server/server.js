@@ -4,6 +4,7 @@ import express from 'express';
 import cors from 'cors';
 import pg from 'pg';
 import { hashPassword, checkPassword, makeToken, readToken, calcFee } from './lib.js';
+import { migrateBoss, mountBoss, mountBossAdmin } from './boss.js';
 
 const pool = new pg.Pool({ connectionString: process.env.DATABASE_URL });
 const app = express();
@@ -53,6 +54,9 @@ async function auth(req, res, next) {
   next();
 }
 const adminOnly = (req, res, next) => next(req.user.role === 'admin' ? undefined : fail(403, 'Faqat admin uchun'));
+
+// Boshliq sahifasi — login emas, maxfiy havola kaliti bilan
+mountBoss(app, pool, fail);
 
 app.use('/api', auth);
 
@@ -215,6 +219,7 @@ app.get('/api/receipts', async (req, res) => {
 
 // ---------- Admin ----------
 app.use('/api/admin', adminOnly);
+mountBossAdmin(app, pool);
 
 app.get('/api/admin/stats', async (req, res) => {
   const [zones, week, guards, today] = await Promise.all([
@@ -325,7 +330,7 @@ await pool.query(`
   ALTER TABLE sessions ADD COLUMN IF NOT EXISTS ticket_no TEXT UNIQUE;
   ALTER TABLE sessions ADD COLUMN IF NOT EXISTS paid BOOLEAN NOT NULL DEFAULT true;
   INSERT INTO settings VALUES ('premium_hour', 30000) ON CONFLICT (key) DO NOTHING;
-  DELETE FROM settings WHERE key = 'premium_mult';`).catch((e) => {
+  DELETE FROM settings WHERE key = 'premium_mult';`).then(() => migrateBoss(pool)).catch((e) => {
   console.error(`Baza tayyor emas (${e.message}). Avval: npm run init-db`);
   process.exit(1);
 });

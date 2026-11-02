@@ -140,3 +140,31 @@ cd ../avto-stoyanka
 npm install
 npm run dev                 # http://localhost:5173
 ```
+
+## 10. Boshliq sahifasi
+
+Alohida havola: `http://<sayt>/boshliq?key=<kalit>`. Login kerak emas — kalitni bilgan kishi ko'radi.
+Admin panel → «Umumiy» → «Boshliq sahifasi»: havolani nusxalash, ochish, yangilash (eski havola ishlamay qoladi).
+
+Davrlar: **Bugun** (soatma-soat), **Hafta** (7 kun), **Oy** (30 kun). Ko'rsatkichlar: kirgan/chiqqan mashinalar,
+tushum, premium ulushi, o'rtacha turish vaqti, to'lanmagan qarz, qorovullar bo'yicha tushum.
+
+```
+Foyda = Tushum − Ish haqi − Xarajatlar
+Ish haqi   = har xodimning kunlik haqi × davr kunlari (qorovul 200 000, moykachi 150 000 so'm/kun)
+Xarajatlar = kunlik × kunlar + oylik × kunlar / 30 + foizli × tushum / 100
+```
+
+- Har ishchi uchun kunlik, haftalik va oylik summa avtomatik hisoblanadi. Ishchi qaysi muddatda olishni xohlasa
+  (kunlik / haftalik / oylik), shu belgilanadi — «Qo'liga» va «Keyingi to'lov» sanasi shunga qarab chiqadi.
+- Xarajatlar ro'yxati (ijara, elektr, suv, internet, ta'mir fondi, moyka vositalari, soliq %) — sahifaning o'zida tahrirlanadi.
+- Raqamlar sanab chiqadi, grafik ustunlari o'sib chiqadi, taqsimot halqasi chiziladi; sahifa har 30 soniyada yangilanadi.
+
+| Metod | Yo'l | Vazifa |
+|---|---|---|
+| GET | `/api/boss?key=&period=day\|week\|month` | statistika, ish haqi, xarajatlar, foyda |
+| PUT | `/api/boss/staff/:id?key=` | `{ pay_period }` — ishchi olish muddati |
+| POST/PUT/DELETE | `/api/boss/expenses[/:id]?key=` | xarajatlar |
+| GET/POST | `/api/admin/boss-link` | (admin) kalitni ko'rish / yangilash |
+
+Sinov uchun 30 kunlik tarix: `npm run demo` (server papkasida).

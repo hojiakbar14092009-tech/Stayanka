@@ -22,3 +22,14 @@ test('token va parol', () => {
   assert.ok(checkPassword('qorovul1', h));
   assert.ok(!checkPassword('boshqa', h));
 });
+
+test('boshliq: xarajat va to\'lov sanasi', async () => {
+  const { expenseFor, nextPayout } = await import('./boss.js');
+  assert.equal(expenseFor({ period: 'month', amount: 3000000 }, 1, 0), 100000);
+  assert.equal(expenseFor({ period: 'day', amount: 50000 }, 7, 0), 350000);
+  assert.equal(expenseFor({ period: 'percent', amount: 4 }, 30, 1000000), 40000);
+  const wed = new Date(2026, 10, 4); // chorshanba
+  assert.equal(nextPayout('day', wed), '2026-11-05'); // ertaga
+  assert.equal(nextPayout('week', wed), '2026-11-09'); // dushanba
+  assert.equal(nextPayout('month', wed), '2026-12-01');
+});

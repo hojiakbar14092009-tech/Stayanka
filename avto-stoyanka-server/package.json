@@ -6,7 +6,8 @@
   "scripts": {
     "start": "node --env-file-if-exists=.env server.js",
     "init-db": "node --env-file-if-exists=.env init-db.js",
-    "test": "node --test"
+    "test": "node --test",
+    "demo": "node --env-file-if-exists=.env demo-data.js"
   },
   "dependencies": {
     "cors": "^2.8.6",

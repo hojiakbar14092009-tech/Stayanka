@@ -34,3 +34,4 @@ Kirish: `admin / admin123`, qorovullar: `aziz / qorovul1`, `bekzod / qorovul2`, 
 - Chiqishda chek printerdan chiqqandek animatsiya bilan chiqadi, arxivda saqlanadi
 - Mashina kirsa yoki chiqsa, hamma ochiq panelga xabar keladi va 3D darvoza ochiladi
 - Admin: statistika, joylarni ta'mirga yopish va premium qilish, tarif, qorovul profillari
+- Boshliq sahifasi (alohida havola): kunlik/haftalik/oylik tushum, ish haqi (qorovul 200 000, moykachi 150 000), xarajatlar va sof foyda — animatsion grafiklar bilan

@@ -2,6 +2,43 @@
 import { useEffect, useState } from 'react';
 import { api, money, calcFee } from './api';
 
+// ---------- Boshliq havolasi: nusxalash, ochish, yangilash (eskisi ishlamay qoladi) ----------
+function BossLink() {
+  const [key, setKey] = useState('');
+  const [msg, setMsg] = useState('');
+  useEffect(() => {
+    api('/admin/boss-link').then((r) => setKey(r.key), (e) => setMsg(e.message));
+  }, []);
+  const url = key ? `${window.location.origin}/boshliq?key=${key}` : '';
+  const copy = async () => {
+    try {
+      await navigator.clipboard.writeText(url);
+      setMsg('Havola nusxalandi');
+    } catch {
+      setMsg("Nusxalab bo'lmadi — havolani qo'lda belgilang");
+    }
+  };
+  const renew = async () => {
+    if (!window.confirm("Yangi havola yaratilsinmi? Eski havola ishlamay qoladi.")) return;
+    const r = await api('/admin/boss-link', { method: 'POST' });
+    setKey(r.key);
+    setMsg('Yangi havola yaratildi');
+  };
+  return (
+    <section className="card">
+      <h2>Boshliq sahifasi</h2>
+      <p className="muted small">Shu havolani boshliqqa yuboring: kunlik, haftalik, oylik tushum, ish haqi va xarajatlar. Login kerak emas.</p>
+      <div className="boss-link">
+        <code>{url || '…'}</code>
+        <button className="btn primary sm" onClick={copy} disabled={!url}>Nusxalash</button>
+        <a className="btn ghost sm" href={url} target="_blank" rel="noreferrer">Ochish</a>
+      </div>
+      <button className="btn ghost sm danger-text" onClick={renew} style={{ marginTop: '.6rem' }}>Havolani yangilash</button>
+      {msg && <p className="muted" role="status">{msg}</p>}
+    </section>
+  );
+}
+
 // ---------- Umumiy holat ----------
 export function Overview({ spots, lastEvent }) {
   const [stats, setStats] = useState(null);
@@ -31,6 +68,8 @@ export function Overview({ spots, lastEvent }) {
         <div className="tile"><span>To'lanmagan (qarz)</span><b className="debt">{money(stats.today.unpaid)}</b></div>
         <div className="tile"><span>O'rtacha turish</span><b>{stats.today.avg_minutes} <small>daq</small></b></div>
       </div>
+
+      <BossLink />
 
       <div className="panels">
         <section className="card">

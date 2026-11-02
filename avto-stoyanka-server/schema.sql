@@ -1,5 +1,5 @@
 -- AvtoStoyanka bazasi. init-db.js ishga tushiradi (qayta ishga tushirsa — tozadan yaratadi).
-DROP TABLE IF EXISTS sessions, spots, users, settings CASCADE;
+DROP TABLE IF EXISTS sessions, spots, users, settings, staff, expenses, kv CASCADE;
 
 -- Profillar: admin va qorovullar
 CREATE TABLE users (
