@@ -69,6 +69,26 @@ function profileShape(points) {
   return s;
 }
 
+let blobTex = null;
+function contactShadow(len, width) {
+  if (!blobTex) {
+    const c = document.createElement('canvas');
+    c.width = c.height = 128;
+    const g = c.getContext('2d');
+    const grd = g.createRadialGradient(64, 64, 10, 64, 64, 64);
+    grd.addColorStop(0, 'rgba(0,0,0,.75)');
+    grd.addColorStop(1, 'rgba(0,0,0,0)');
+    g.fillStyle = grd;
+    g.fillRect(0, 0, 128, 128);
+    blobTex = new THREE.CanvasTexture(c);
+  }
+  const m = new THREE.Mesh(new THREE.PlaneGeometry(len, width), new THREE.MeshBasicMaterial({ map: blobTex, transparent: true, depthWrite: false }));
+  m.rotation.x = -Math.PI / 2;
+  m.position.y = 0.025;
+  m.renderOrder = 1;
+  return m;
+}
+
 export function buildCar(type = 'sedan') {
   const T = CAR_TYPES[type] || CAR_TYPES.sedan;
   const half = T.width / 2;
@@ -159,6 +179,7 @@ export function buildCar(type = 'sedan') {
     car.add(w);
     wheels.push(w);
   }
+  car.add(contactShadow(2.9, T.width + 0.55));
   const setPlate = (plate) => {
     drawPlate(canvas.getContext('2d'), plate);
     plateTex.needsUpdate = true;
@@ -376,18 +397,22 @@ export function poseGuard(guard, mode, time, dt, lookAt) {
 // Mashina fizikasi: tezlik, tezlanish → g'ildirak aylanishi, burun egilishi, stop-chiroq
 export function driveCar(car, x, z, dt) {
   const u = car.userData;
-  if (u.lastX === null) u.lastX = x;
-  const dx = x - u.lastX;
-  const v = dt > 0 ? dx / dt : 0;
+  if (u.lastX === null) {
+    u.lastX = x;
+    u.lastZ = z;
+  }
+  // oldinga siljish: mashina qaragan yo'nalish bo'yicha (burilishlarda ham to'g'ri)
+  const fwd = (x - u.lastX) * Math.cos(car.rotation.y) - (z - u.lastZ) * Math.sin(car.rotation.y);
+  const v = dt > 0 ? fwd / dt : 0;
   const a = dt > 0 ? (v - u.v) / dt : 0;
   u.a = lerp(u.a, a, Math.min(1, dt * 6));
   u.v = v;
   u.lastX = x;
+  u.lastZ = z;
   car.position.set(x, 0, z);
-  const dir = Math.cos(car.rotation.y); // +1 o'ngga, -1 chapga
-  for (const w of u.wheels) w.rotation.z -= (dx * dir) / u.wheelR;
+  for (const w of u.wheels) w.rotation.z -= fwd / u.wheelR;
   // tormozda burun pastga, tezlanishda orqaga cho'kadi
-  u.body.rotation.z = lerp(u.body.rotation.z, THREE.MathUtils.clamp(u.a * dir * -0.006, -0.05, 0.05), Math.min(1, dt * 8));
+  u.body.rotation.z = lerp(u.body.rotation.z, THREE.MathUtils.clamp(u.a * -0.006, -0.05, 0.05), Math.min(1, dt * 8));
   u.body.position.y = Math.sin(performance.now() / 90) * 0.004 * Math.min(1, Math.abs(v) / 3); // yo'l titrashi
   const braking = Math.abs(v) < 0.3 || u.a * Math.sign(v || 1) < -0.5;
   u.tail.emissiveIntensity = lerp(u.tail.emissiveIntensity, braking ? 2.2 : 0.4, Math.min(1, dt * 10));

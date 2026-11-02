@@ -802,3 +802,13 @@ label { display: grid; gap: .3rem; font-size: .9rem; color: var(--paint-dim); }
 .stall.selected .stall-tag, .stall.found .stall-tag { background: #f2c230; color: #15171a; }
 .stall .car { margin-top: 6px; }
 .stall.up .car { margin-top: 0; margin-bottom: 6px; }
+
+/* ---------- 3D: kattalashtirish (butun ekran) ---------- */
+.gate-zoom {
+  position: absolute; left: 8px; top: 8px; z-index: 3; border: 1px solid rgba(255, 255, 255, .5); border-radius: 6px;
+  background: rgba(20, 22, 26, .6); color: #fff; font: 600 .78rem var(--display); padding: .2rem .55rem; backdrop-filter: blur(4px);
+}
+.gate-zoom:hover { background: rgba(20, 22, 26, .85); }
+.gate.expanded { position: fixed; inset: 3vh 3vw; height: auto; z-index: 75; box-shadow: 0 0 0 100vmax rgba(10, 11, 13, .75), 0 30px 80px rgba(0, 0, 0, .6); }
+.gate.expanded .gate-caption { font-size: 1.2rem; }
+.dock:has(.gate.expanded) { z-index: 80; } /* kattalashganda reja ustida turadi */

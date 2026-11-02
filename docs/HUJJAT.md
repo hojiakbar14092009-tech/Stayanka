@@ -208,3 +208,16 @@ Sinov uchun 30 kunlik tarix: `npm run demo` (server papkasida).
   har safar emas (taxminan 4 tadan 1 tasida). Premium joyga ba'zan Cobalt ham keladi.
 - **Joy raqami:** har joyning orqa chizig'ida «aqlli stoyanka» LED tablosi — raqam va chiroq (yashil bo'sh, qizil band,
   sariq ta'mirda, ko'k nogironlar uchun). Mashina turganda ham raqam ko'rinadi.
+
+## 14. Savdo markazi va to'xtash maydoni (3D)
+
+- Shlagbaumdan keyin — **to'xtash maydoni** (2 qator × 10 joy, o'rtada yo'lak) va uning ortida noodatiy savdo markazi:
+  qavariq egri shisha fasad, to'lqinli tom-soyabon, burama shisha minora (har qavat 7° burilgan), aylanma eshik, bayroqlar.
+  Podium tepasida oltin harflarda **«Tashkent City Mall»** yozuvi.
+- **Kirish:** chek berilgach shlagbaum ochiladi, mashina maydonga burilib, yo'lak bo'ylab yuradi va bo'sh joyga kirib to'xtaydi —
+  o'sha joyda qoladi. Maydon to'lsa, eng eski mashina ketgan hisoblanadi.
+- **Chiqish / haydash:** mashina maydondagi joyidan orqaga yurib chiqadi, orolcha uchini aylanib chiqish shlagbaumiga keladi.
+- **Realizm:** mashinalar tagida kontakt soya, piyodalar savdo markazi eshigiga borib-kelishadi, bayroqlar hilpiraydi,
+  aylanma eshik aylanadi, quyosh soyasi butun maydonni qoplaydi.
+- **Kamera:** savdo markazi, maydon va darvoza bir kadrda; harakatdagi mashinani yumshoq kuzatadi.
+  «Kattalashtirish» tugmasi 3D ni butun ekranga ochadi (Esc — yopish).
