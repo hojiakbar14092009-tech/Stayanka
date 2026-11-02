@@ -72,8 +72,8 @@ app.get('/api/events', (req, res) => {
 // ---------- 1. GET /api/spots — hamma joylar, id tartibida, ochiq sessiyasi bilan ----------
 app.get('/api/spots', async (req, res) => {
   const { rows } = await pool.query(`
-    SELECT s.id, s.label, s.zone, s.is_premium, s.is_busy, s.is_disabled,
-           se.id AS session_id, se.plate, se.entered_at, se.ticket_no, u.full_name AS guard_name
+    SELECT s.id, s.label, s.zone, s.is_premium, s.is_busy, s.is_disabled, s.is_accessible,
+           se.id AS session_id, se.plate, se.entered_at, se.ticket_no, se.disabled_driver, u.full_name AS guard_name
     FROM spots s
     LEFT JOIN sessions se ON se.spot_id = s.id AND se.left_at IS NULL
     LEFT JOIN users u ON u.id = se.guard_in
@@ -90,6 +90,8 @@ app.post('/api/enter', async (req, res) => {
   const plate = normPlate(req.body?.plate);
   const spotId = req.body?.spot_id ? Number(req.body.spot_id) : null;
   const premium = req.body?.premium === true;
+  // Nogironlik guvohnomasi: to'xtash bepul, avval nogironlar joyiga qo'yiladi
+  const disabledDriver = req.body?.disabled_driver === true;
   const db = await pool.connect();
   try {
     await db.query('BEGIN');
@@ -97,32 +99,33 @@ app.post('/api/enter', async (req, res) => {
       'SELECT s.label FROM sessions se JOIN spots s ON s.id = se.spot_id WHERE se.plate = $1 AND se.left_at IS NULL', [plate]);
     if (dup.rows[0]) throw fail(409, `${plate} allaqachon ${dup.rows[0].label} joyida turibdi`);
 
+    // Nogironlar joyiga faqat guvohnomasi borlar qo'yiladi
     const spot = spotId
       ? await db.query(
-          'UPDATE spots SET is_busy = true WHERE id = $1 AND NOT is_busy AND NOT is_disabled RETURNING *', [spotId])
+          'UPDATE spots SET is_busy = true WHERE id = $1 AND NOT is_busy AND NOT is_disabled AND (NOT is_accessible OR $2) RETURNING *', [spotId, disabledDriver])
       : await db.query(`
           UPDATE spots SET is_busy = true WHERE id = (
-            SELECT id FROM spots WHERE NOT is_busy AND NOT is_disabled AND is_premium = $1
-            ORDER BY id LIMIT 1 FOR UPDATE SKIP LOCKED)
-          RETURNING *`, [premium]);
+            SELECT id FROM spots WHERE NOT is_busy AND NOT is_disabled AND is_premium = $1 AND ($2 OR NOT is_accessible)
+            ORDER BY ($2 AND is_accessible) DESC, id LIMIT 1 FOR UPDATE SKIP LOCKED)
+          RETURNING *`, [premium, disabledDriver]);
     if (!spot.rows[0]) {
-      throw fail(409, spotId ? 'Bu joy band yoki yopiq' : premium ? "Bo'sh premium joy qolmadi" : "Bo'sh oddiy joy qolmadi");
+      throw fail(409, spotId ? 'Bu joy band, yopiq yoki nogironlar uchun ajratilgan' : premium ? "Bo'sh premium joy qolmadi" : "Bo'sh oddiy joy qolmadi");
     }
 
     const s = spot.rows[0];
     // Avval haydab chiqarilgan bo'lsa — to'lanmagan qarzi
     const debt = await db.query('SELECT COALESCE(SUM(fee), 0)::int AS sum FROM sessions WHERE plate = $1 AND NOT paid', [plate]);
     const ins = await db.query(
-      'INSERT INTO sessions (spot_id, plate, guard_in) VALUES ($1, $2, $3) RETURNING id, entered_at', [s.id, plate, req.user.id]);
+      'INSERT INTO sessions (spot_id, plate, guard_in, disabled_driver) VALUES ($1, $2, $3, $4) RETURNING id, entered_at', [s.id, plate, req.user.id, disabledDriver]);
     // Kirish cheki raqami = QR kod matni. Tasodifiy qism — har mashinaga boshqa, taxmin qilib bo'lmaydi.
     const { id, entered_at } = ins.rows[0];
     const ticketNo = `T${entered_at.toISOString().slice(2, 10).replace(/-/g, '')}${String(id).padStart(5, '0')}-${crypto.randomBytes(3).toString('hex').toUpperCase()}`;
     await db.query('UPDATE sessions SET ticket_no = $2 WHERE id = $1', [id, ticketNo]);
     await db.query('COMMIT');
     const debtSum = debt.rows[0].sum;
-    broadcast({ type: 'enter', plate, label: s.label, is_premium: s.is_premium, guard: req.user.full_name, debt: debtSum });
+    broadcast({ type: 'enter', plate, label: s.label, is_premium: s.is_premium, disabled_driver: disabledDriver, guard: req.user.full_name, debt: debtSum });
     const ticket = {
-      ticket_no: ticketNo, plate, label: s.label, spot_id: s.id, is_premium: s.is_premium, debt: debtSum,
+      ticket_no: ticketNo, plate, label: s.label, spot_id: s.id, is_premium: s.is_premium, disabled_driver: disabledDriver, debt: debtSum,
       entered_at, active: true, guard_in_name: req.user.full_name, tariff: await getTariff(),
     };
     res.status(201).json({ spot: s, ticket });
@@ -152,7 +155,7 @@ async function closeSession(req, res, paid) {
     if (!se) throw fail(404, "Bu joyda mashina yo'q");
 
     const tariff = await getTariff(db);
-    const fee = calcFee(se.now - se.entered_at, tariff, se.is_premium);
+    const fee = se.disabled_driver ? 0 : calcFee(se.now - se.entered_at, tariff, se.is_premium); // nogironlar uchun bepul
     const receiptNo = `${paid ? 'CH' : 'QZ'}-${se.now.toISOString().slice(0, 10).replace(/-/g, '')}-${String(se.id).padStart(5, '0')}`;
     await db.query(
       'UPDATE sessions SET left_at = $2, fee = $3, guard_out = $4, receipt_no = $5, paid = $6 WHERE id = $1',
@@ -161,7 +164,7 @@ async function closeSession(req, res, paid) {
     await db.query('COMMIT');
 
     const receipt = {
-      receipt_no: receiptNo, ticket_no: se.ticket_no, plate: se.plate, label: se.label, is_premium: se.is_premium,
+      receipt_no: receiptNo, ticket_no: se.ticket_no, plate: se.plate, label: se.label, is_premium: se.is_premium, disabled_driver: se.disabled_driver,
       entered_at: se.entered_at, left_at: se.now, fee, paid, guard_out_name: req.user.full_name,
       hours: Math.max(1, Math.ceil((se.now - se.entered_at) / 3600000)), tariff,
     };
@@ -188,7 +191,7 @@ app.get('/api/revenue', async (req, res) => {
 app.get('/api/tickets/:code', async (req, res) => {
   const code = String(req.params.code).toUpperCase().replace(/[\s-]/g, '');
   const { rows } = await pool.query(`
-    SELECT se.id, se.ticket_no, se.receipt_no, se.plate, se.entered_at, se.left_at, se.fee, se.paid, se.spot_id,
+    SELECT se.id, se.ticket_no, se.receipt_no, se.plate, se.entered_at, se.left_at, se.fee, se.paid, se.disabled_driver, se.spot_id,
            s.label, s.zone, s.is_premium, se.left_at IS NULL AS active, gi.full_name AS guard_in_name
     FROM sessions se JOIN spots s ON s.id = se.spot_id
     LEFT JOIN users gi ON gi.id = se.guard_in
@@ -202,7 +205,7 @@ app.get('/api/tickets/:code', async (req, res) => {
 app.get('/api/receipts', async (req, res) => {
   const { q = '', from = null, to = null } = req.query;
   const { rows } = await pool.query(`
-    SELECT se.id, se.receipt_no, se.ticket_no, se.plate, se.entered_at, se.left_at, se.fee, se.paid,
+    SELECT se.id, se.receipt_no, se.ticket_no, se.plate, se.entered_at, se.left_at, se.fee, se.paid, se.disabled_driver,
            s.label, s.is_premium, gi.full_name AS guard_in_name, go.full_name AS guard_out_name
     FROM sessions se
     JOIN spots s ON s.id = se.spot_id
@@ -249,10 +252,10 @@ app.get('/api/admin/stats', async (req, res) => {
 
 // Joyni premium / ta'mirda qilish
 app.put('/api/admin/spots/:id', async (req, res) => {
-  const { is_premium = null, is_disabled = null } = req.body || {};
+  const { is_premium = null, is_disabled = null, is_accessible = null } = req.body || {};
   const { rows } = await pool.query(`
-    UPDATE spots SET is_premium = COALESCE($2, is_premium), is_disabled = COALESCE($3, is_disabled)
-    WHERE id = $1 AND NOT (is_busy AND COALESCE($3, false)) RETURNING *`, [req.params.id, is_premium, is_disabled]);
+    UPDATE spots SET is_premium = COALESCE($2, is_premium), is_disabled = COALESCE($3, is_disabled), is_accessible = COALESCE($4, is_accessible)
+    WHERE id = $1 AND NOT (is_busy AND COALESCE($3, false)) RETURNING *`, [req.params.id, is_premium, is_disabled, is_accessible]);
   if (!rows[0]) throw fail(409, "Band joyni yopib bo'lmaydi — avval mashinani chiqaring");
   broadcast({ type: 'spot', label: rows[0].label });
   res.json(rows[0]);
@@ -329,6 +332,8 @@ app.use((err, req, res, next) => {
 await pool.query(`
   ALTER TABLE sessions ADD COLUMN IF NOT EXISTS ticket_no TEXT UNIQUE;
   ALTER TABLE sessions ADD COLUMN IF NOT EXISTS paid BOOLEAN NOT NULL DEFAULT true;
+  ALTER TABLE sessions ADD COLUMN IF NOT EXISTS disabled_driver BOOLEAN NOT NULL DEFAULT false;
+  ALTER TABLE spots ADD COLUMN IF NOT EXISTS is_accessible BOOLEAN NOT NULL DEFAULT false;
   INSERT INTO settings VALUES ('premium_hour', 30000) ON CONFLICT (key) DO NOTHING;
   DELETE FROM settings WHERE key = 'premium_mult';`).then(() => migrateBoss(pool)).catch((e) => {
   console.error(`Baza tayyor emas (${e.message}). Avval: npm run init-db`);

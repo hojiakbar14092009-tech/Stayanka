@@ -168,3 +168,14 @@ Xarajatlar = kunlik × kunlar + oylik × kunlar / 30 + foizli × tushum / 100
 | GET/POST | `/api/admin/boss-link` | (admin) kalitni ko'rish / yangilash |
 
 Sinov uchun 30 kunlik tarix: `npm run demo` (server papkasida).
+
+## 11. Nogironlar uchun bepul
+
+- Har oddiy zonaning kirishga eng yaqin 2 joyi (B-01, B-02, C-01, C-02, …) — **nogironlar joyi**: ko'k bo'yoq,
+  yerda xalqaro nogironlar belgisi. Admin → «Joylar» → «♿ Nogironlar joyi» rejimida o'zgartiriladi.
+- Qorovul kirishda (kamera kartasida yoki qo'lda) **«Nogironlik guvohnomasi bor»** tugmasini bosadi.
+  Mashina avval nogironlar joyiga, u band bo'lsa — oddiy joyga qo'yiladi. **To'lov — 0 so'm**, premium joyda ham.
+- Guvohnomasiz mashina nogironlar joyiga qo'yilmaydi (avtomatik ham, qo'lda ham).
+- Kirish chekida, chiqish chekida, arxivda, xabarda va boshliq sahifasida «♿ bepul» belgisi; 3D darvozada
+  «Nogironlar uchun BEPUL» belgisi va yo'lda bo'yalgan belgi.
+- API: `POST /api/enter` `{ disabled_driver: true }`; `sessions.disabled_driver`, `spots.is_accessible`.

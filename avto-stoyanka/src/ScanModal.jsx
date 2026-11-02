@@ -81,7 +81,7 @@ export default function ScanModal({ code, onClose, onExit }) {
               <dt>Joy</dt><dd>{ticket.label}{ticket.is_premium ? ' (Premium)' : ''}</dd>
               <dt>Kirdi</dt><dd>{time(ticket.entered_at)}</dd>
               <dt>Turdi</dt><dd>{duration(stay)}</dd>
-              <dt>To'lov</dt><dd className="price">{money(calcFee(stay, ticket.tariff, ticket.is_premium))}</dd>
+              <dt>To'lov</dt><dd className="price">{ticket.disabled_driver ? 'Bepul (nogironlar uchun)' : money(calcFee(stay, ticket.tariff, ticket.is_premium))}</dd>
             </dl>
             <button className="btn danger big" onClick={() => exit(true)} disabled={busy} autoFocus>To'landi: chiqarish va chek berish</button>
             {confirmExpel ? (

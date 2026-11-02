@@ -635,3 +635,22 @@ label { display: grid; gap: .3rem; font-size: .9rem; color: var(--paint-dim); }
 /* Admin: boshliq havolasi */
 .boss-link { display: grid; grid-template-columns: 1fr auto auto; gap: .5rem; align-items: center; }
 .boss-link code { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; background: var(--asphalt); padding: .45rem .6rem; border-radius: 6px; font-size: .85rem; }
+
+/* ---------- Nogironlar joyi: ko'k bo'yoq, yerda xalqaro belgi, bepul ---------- */
+.stall.accessible { --line: #3b7bff; }
+.stall.accessible.free { background: rgba(30, 91, 216, .2); }
+.stall.accessible.free::after { display: none; }
+.stall.accessible.free:hover { background: rgba(30, 91, 216, .32); }
+.isa { width: 34px; height: 34px; opacity: .92; flex: none; }
+.isa.small { width: 1.15em; height: 1.15em; vertical-align: -.22em; opacity: 1; }
+.isa-badge { position: absolute; right: 3px; top: 50%; translate: 0 -50%; z-index: 2; font-size: .9rem; line-height: 0; }
+.mini i.acc { background: #3b7bff; }
+.key.acc { background: #1e5bd8; }
+.access-toggle {
+  width: 100%; margin: .45rem 0 0; display: flex; align-items: center; justify-content: center; gap: .45rem;
+  background: transparent; border: 2px solid #3b7bff; color: #cfe0ff;
+}
+.access-toggle.on { background: #1e5bd8; color: #fff; }
+.access-toggle .isa { margin: 0; }
+.t-free { color: #1e5bd8; font-weight: 800; text-align: center; margin: .35rem 0 0; }
+.chip.acc { border-color: #3b7bff; background: rgba(30, 91, 216, .2); }

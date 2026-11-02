@@ -89,7 +89,7 @@ export default function App() {
       reload().catch(() => {});
       if (ev.type === 'enter') {
         setLastEvent(ev);
-        notify(`${ev.plate} → ${ev.label}${ev.is_premium ? ' (Premium)' : ''}${ev.debt ? `. Qarzi bor: ${money(ev.debt)}` : ''}`, ev.debt ? 'expel' : 'enter');
+        notify(`${ev.plate} → ${ev.label}${ev.is_premium ? ' (Premium)' : ''}${ev.disabled_driver ? ' ♿ bepul' : ''}${ev.debt ? `. Qarzi bor: ${money(ev.debt)}` : ''}`, ev.debt ? 'expel' : 'enter');
       } else if (ev.type === 'exit') {
         setLastEvent(ev);
         notify(`${ev.plate} ${ev.label} joyidan chiqdi, ${money(ev.fee)}`, 'exit');

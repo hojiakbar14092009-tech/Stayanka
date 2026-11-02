@@ -46,7 +46,7 @@ export default function Archive() {
                   <td>{dateTime(r.entered_at)}</td>
                   <td>{dateTime(r.left_at)}</td>
                   <td>{r.guard_out_name}</td>
-                  <td className={`num${r.paid === false ? ' unpaid' : ''}`}>{r.paid === false && <small>qarz </small>}{money(r.fee)}</td>
+                  <td className={`num${r.paid === false ? ' unpaid' : ''}`}>{r.paid === false && <small>qarz </small>}{r.disabled_driver ? <small>♿ bepul</small> : money(r.fee)}</td>
                 </tr>
               ))}
             </tbody>

@@ -54,7 +54,7 @@ function Car({ plate, premium, leaving, onDone }) {
 // Joy. Mashina yo'lakdan burilib kiradi; chiqqanda orqaga yurib, yo'lak bo'ylab ketadi (lane: r = o'ngga, l = chapga).
 function Stall({ spot, face, lane, selected, found, onPick }) {
   const state = spot.is_disabled ? 'off' : spot.is_busy ? 'busy' : 'free';
-  const title = spot.is_disabled ? "ta'mirda" : spot.is_busy ? `band, ${spot.plate}, ${brandFor(spot.plate, spot.is_premium)}` : "bo'sh";
+  const title = spot.is_disabled ? "ta'mirda" : !spot.is_busy && spot.is_accessible ? "bo'sh, nogironlar uchun" : spot.is_busy ? `band, ${spot.plate}, ${brandFor(spot.plate, spot.is_premium)}` : "bo'sh";
   // Chiqib ketayotgan mashinani animatsiya tugaguncha ko'rsatamiz
   const [prev, setPrev] = useState({ busy: spot.is_busy, plate: spot.plate });
   const [leaving, setLeaving] = useState(null);
@@ -65,12 +65,14 @@ function Stall({ spot, face, lane, selected, found, onPick }) {
   return (
     <button
       data-spot={spot.id}
-      className={`stall ${face} ${lane} ${state}${spot.is_premium ? ' premium' : ''}${selected ? ' selected' : ''}${found ? ' found' : ''}`}
+      className={`stall ${face} ${lane} ${state}${spot.is_premium ? ' premium' : ''}${spot.is_accessible ? ' accessible' : ''}${selected ? ' selected' : ''}${found ? ' found' : ''}`}
       onClick={() => onPick(spot.id)}
       aria-label={`${spot.label}, ${title}`}
       aria-pressed={selected}
     >
       <span className="stall-no">{spot.label.slice(2)}</span>
+      {spot.is_accessible && !spot.is_busy && <AccessSign />}
+      {spot.is_busy && spot.disabled_driver && <span className="isa-badge" title="Nogironlar uchun bepul"><AccessSign small /></span>}
       {spot.is_busy && <Car key={spot.session_id} plate={spot.plate} premium={spot.is_premium} />}
       {leaving && <Car key="out" plate={leaving} premium={spot.is_premium} leaving onDone={() => setLeaving(null)} />}
       {spot.is_busy && <span className="stall-plate">{spot.plate}</span>}
@@ -78,6 +80,26 @@ function Stall({ spot, face, lane, selected, found, onPick }) {
     </button>
   );
 }
+
+// Joy yerida bo'yalgan xalqaro nogironlar belgisi
+function AccessSign({ small }) {
+  return (
+    <svg className={small ? 'isa small' : 'isa'} viewBox="0 0 24 24" aria-hidden="true">
+      <rect width="24" height="24" rx="3" fill="#1e5bd8" />
+      <g fill="none" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <circle cx="11" cy="4.6" r="1.3" fill="#fff" />
+        <path d="M11 7.5 V13 H15.8 L18 18 M11 10 H15" />
+        <path d="M8.6 11 a5 5 0 1 0 6.9 7" />
+      </g>
+    </svg>
+  );
+}
+
+// Nogironlar joyini tanlash: guvohnomasi bo'lsa — avval nogironlar joyi, bo'lmasa oddiy joy; oddiy mashina nogironlar joyiga qo'yilmaydi
+const pickFree = (list, prem, dd) => {
+  const ok = (s) => !s.is_busy && !s.is_disabled && s.is_premium === prem;
+  return (dd && list.find((s) => ok(s) && s.is_accessible)) || list.find((s) => ok(s) && !s.is_accessible);
+};
 
 // Moykachilar jamoasi: har biri boshqa ko'rinishda, boshqa tezlikda, boshqa asbob bilan
 const CREW = [
@@ -280,7 +302,7 @@ function MiniMap({ list, foundIds }) {
   return (
     <span className="mini" aria-hidden="true">
       {list.map((s) => (
-        <i key={s.id} className={foundIds.has(s.id) ? 'hit' : s.is_disabled ? 'off' : s.is_busy ? 'busy' : ''} />
+        <i key={s.id} className={foundIds.has(s.id) ? 'hit' : s.is_disabled ? 'off' : s.is_busy ? 'busy' : s.is_accessible ? 'acc' : ''} />
       ))}
     </span>
   );
@@ -298,26 +320,29 @@ export default function GuardPanel({ spots, tariff, reload, lastEvent, notify })
   const [receipt, setReceipt] = useState(null);
   const [ticket, setTicket] = useState(null);
   const [premium, setPremium] = useState(false); // qo'lda kiritishda: mijoz premium joy so'radimi
+  const [disabledDriver, setDisabledDriver] = useState(false); // nogironlik guvohnomasi — bepul
   const [arrival, setArrival] = useState(null); // kamera oldiga kelgan mashina
   const [arrived, setArrived] = useState(null); // kamera o'qigan va avtomatik kiritilgan mashina
   const [reject, setReject] = useState(null); // kiritib bo'lmadi — mashina orqaga qaytariladi
   const [release, setRelease] = useState(null); // chek berildi — shlagbaum ochiladi
   const [hidden, setHidden] = useState(() => new Set()); // bazada band, lekin mashina hali darvozada — rejada ko'rsatilmaydi
   const [arrivePremium, setArrivePremium] = useState(false);
+  const [arriveDisabled, setArriveDisabled] = useState(false);
   const plateInput = useRef(null);
   const now = useNow();
 
   const selected = spots.find((s) => s.id === selectedId);
   // Ketma-ket to'ldirish: blok to'lmaguncha keyingisiga o'tilmaydi; premium faqat mijoz xohlasa
   const nextFree = useMemo(
-    () => spots.find((s) => !s.is_busy && !s.is_disabled && s.is_premium === premium),
-    [spots, premium]
+    () => pickFree(spots, premium, disabledDriver),
+    [spots, premium, disabledDriver]
   );
 
   // Kamera raqamni o'qidi → mashina shlagbaum oldida kutadi, joy avtomatik tanlanadi.
   // Qorovul chekni chop etib bergandan keyingina mashina kiradi (yoki cheksiz kirgizadi).
   const plateRead = (p) => {
     setArrivePremium(false);
+    setArriveDisabled(false);
     setArrived({ plate: p, status: 'read' });
   };
 
@@ -336,7 +361,7 @@ export default function GuardPanel({ spots, tariff, reload, lastEvent, notify })
     const p = arrived.plate;
     setArrived({ plate: p, status: 'saving' });
     try {
-      const { spot, ticket: t } = await api('/enter', { method: 'POST', body: { plate: p, premium: arrivePremium } });
+      const { spot, ticket: t } = await api('/enter', { method: 'POST', body: { plate: p, premium: arrivePremium, disabled_driver: arriveDisabled } });
       setHidden((h) => new Set(h).add(spot.id));
       setSelectedId(null);
       setZone(spot.zone);
@@ -393,10 +418,11 @@ export default function GuardPanel({ spots, tariff, reload, lastEvent, notify })
     try {
       const { spot, ticket: t } = await api('/enter', {
         method: 'POST',
-        body: { plate, premium, spot_id: selected && !selected.is_busy ? selected.id : undefined },
+        body: { plate, premium, disabled_driver: disabledDriver, spot_id: selected && !selected.is_busy ? selected.id : undefined },
       });
       setPlate('');
       setPremium(false);
+      setDisabledDriver(false);
       setSelectedId(null);
       setZone(spot.zone);
       setTicket(t);
@@ -426,7 +452,7 @@ export default function GuardPanel({ spots, tariff, reload, lastEvent, notify })
 
   const view = hidden.size ? spots.map((s) => (hidden.has(s.id) ? { ...s, is_busy: false, plate: null, session_id: null } : s)) : spots;
   const zoneSpots = view.filter((s) => s.zone === zone);
-  const readyFree = view.find((s) => !s.is_busy && !s.is_disabled && s.is_premium === arrivePremium);
+  const readyFree = pickFree(view, arrivePremium, arriveDisabled);
   const stayMs = selected?.entered_at ? now - new Date(selected.entered_at) : 0;
   const firstHour = (prem) => tariff && money(prem ? tariff.premium_hour : tariff.base_hour);
 
@@ -450,7 +476,7 @@ export default function GuardPanel({ spots, tariff, reload, lastEvent, notify })
         </nav>
         <LotMap spots={zoneSpots} selectedId={selectedId} foundIds={foundIds} onPick={pick} />
         <p className="legend">
-          <span className="key free" /> bo'sh <span className="key busy" /> band <span className="key off" /> ta'mirda <Icon name="crown" /> premium, yopiq
+          <span className="key free" /> bo'sh <span className="key busy" /> band <span className="key off" /> ta'mirda <Icon name="crown" /> premium, yopiq <AccessSign small /> nogironlar uchun, bepul
         </p>
       </section>
 
@@ -507,6 +533,9 @@ export default function GuardPanel({ spots, tariff, reload, lastEvent, notify })
                   <button type="button" className={arrivePremium ? '' : 'on'} onClick={() => setArrivePremium(false)}>Oddiy joy</button>
                   <button type="button" className={arrivePremium ? 'on gold-on' : ''} onClick={() => setArrivePremium(true)}><Icon name="crown" /> Premium</button>
                 </div>
+                <button type="button" className={`btn access-toggle${arriveDisabled ? ' on' : ''}`} onClick={() => setArriveDisabled((v) => !v)} aria-pressed={arriveDisabled}>
+                  <AccessSign small /> Nogironlik guvohnomasi bor{arriveDisabled ? ': bepul' : ''}
+                </button>
                 <p className="muted small">Mashina shlagbaum oldida kutmoqda. Chek berilgach kiradi.</p>
                 <div className="arrived-actions">
                   <button className="btn primary" onClick={() => admit(true)} disabled={!readyFree}>
@@ -553,7 +582,7 @@ export default function GuardPanel({ spots, tariff, reload, lastEvent, notify })
                 <dt>Marka</dt><dd>{brandFor(selected.plate, selected.is_premium)}</dd>
                 <dt>Kirdi</dt><dd>{time(selected.entered_at)}</dd>
                 <dt>Turibdi</dt><dd>{duration(stayMs)}</dd>
-                <dt>Hozirgi narx</dt><dd className="price">{tariff && money(calcFee(stayMs, tariff, selected.is_premium))}</dd>
+                <dt>Hozirgi narx</dt><dd className="price">{selected.disabled_driver ? <>Bepul <AccessSign small /></> : tariff && money(calcFee(stayMs, tariff, selected.is_premium))}</dd>
               </dl>
               <button className="btn danger big" onClick={() => setScanning(selected.ticket_no)} disabled={!selected.ticket_no}>
                 <Icon name="scan" /> Chekni skanerlab chiqarish
@@ -573,6 +602,9 @@ export default function GuardPanel({ spots, tariff, reload, lastEvent, notify })
                   <button type="button" className={premium ? 'on gold-on' : ''} onClick={() => setPremium(true)}><Icon name="crown" /> Premium, yopiq</button>
                 </div>
               )}
+              <button type="button" className={`btn access-toggle${disabledDriver ? ' on' : ''}`} onClick={() => setDisabledDriver((v) => !v)} aria-pressed={disabledDriver}>
+                <AccessSign small /> Nogironlik guvohnomasi bor{disabledDriver ? ': bepul' : ''}
+              </button>
               <input
                 ref={plateInput}
                 className="input plate-input"

@@ -568,6 +568,43 @@ function buildWorld(scene) {
   scene.add(box(0.08, 2.8, 0.08, mat(0x8a8f96), { x: -4.2, y: 1.4, z: -ROAD_EDGE - 0.6 }));
   scene.add(mesh(new THREE.PlaneGeometry(0.9, 0.9), new THREE.MeshStandardMaterial({ map: pTex }), { x: -4.2, y: 2.85, z: -ROAD_EDGE - 0.55 }));
 
+  // Nogironlar belgisi: "nogironlar uchun bepul" (kirishda, yo'l chetida)
+  {
+    const c = document.createElement('canvas');
+    c.width = 256;
+    c.height = 320;
+    const g = c.getContext('2d');
+    g.fillStyle = '#1e5bd8';
+    g.fillRect(0, 0, 256, 320);
+    g.strokeStyle = '#fff';
+    g.lineWidth = 8;
+    g.strokeRect(10, 10, 236, 300);
+    g.save();
+    g.translate(38, 22);
+    g.scale(7.5, 7.5);
+    g.lineWidth = 2;
+    g.lineCap = 'round';
+    g.lineJoin = 'round';
+    g.fillStyle = '#fff';
+    g.beginPath();
+    g.arc(11, 4.6, 1.4, 0, Math.PI * 2);
+    g.fill();
+    g.stroke(new Path2D('M11 7.5 V13 H15.8 L18 18 M11 10 H15'));
+    g.stroke(new Path2D('M8.6 11 a5 5 0 1 0 6.9 7'));
+    g.restore();
+    g.fillStyle = '#fff';
+    g.textAlign = 'center';
+    g.font = 'bold 44px Arial';
+    g.fillText('BEPUL', 128, 270);
+    const tex = new THREE.CanvasTexture(c);
+    tex.colorSpace = THREE.SRGBColorSpace;
+    scene.add(box(0.08, 2.4, 0.08, mat(0x8a8f96), { x: -6.2, y: 1.2, z: -ROAD_EDGE - 0.6 }));
+    const board = mesh(new THREE.PlaneGeometry(0.8, 1.0), new THREE.MeshStandardMaterial({ map: tex, emissive: 0xffffff, emissiveMap: tex, emissiveIntensity: 0.25 }), { x: -6.2, y: 2.25, z: -ROAD_EDGE - 0.55 });
+    scene.add(board);
+    // Yo'l yuzasidagi bo'yalgan belgi (kirish yo'lagida)
+    scene.add(decal(tex, 1.1, 1.38, -10, LANE_IN, Math.PI / 2));
+  }
+
   // Raqam kameralari (past ustun, mashinaga qaragan)
   for (const [p, face] of [[CAM_IN, -1], [CAM_OUT, 1]]) {
     scene.add(box(0.07, p.y, 0.07, mat(0x6f7378), { x: p.x, y: p.y / 2 + 0.15, z: p.z }));

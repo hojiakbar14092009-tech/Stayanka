@@ -18,7 +18,8 @@ CREATE TABLE spots (
   zone CHAR(1) NOT NULL,
   is_premium BOOLEAN NOT NULL DEFAULT false,
   is_busy BOOLEAN NOT NULL DEFAULT false,
-  is_disabled BOOLEAN NOT NULL DEFAULT false
+  is_disabled BOOLEAN NOT NULL DEFAULT false,
+  is_accessible BOOLEAN NOT NULL DEFAULT false -- nogironlar uchun joy
 );
 
 -- Sessiyalar = cheklar arxivi
@@ -33,7 +34,8 @@ CREATE TABLE sessions (
   guard_out INTEGER REFERENCES users(id),
   ticket_no TEXT UNIQUE,  -- kirish cheki (QR)
   receipt_no TEXT UNIQUE, -- chiqish cheki (QZ- = to'lanmagan, haydalgan)
-  paid BOOLEAN NOT NULL DEFAULT true
+  paid BOOLEAN NOT NULL DEFAULT true,
+  disabled_driver BOOLEAN NOT NULL DEFAULT false -- nogironlik guvohnomasi: bepul
 );
 -- Bitta joyda faqat bitta ochiq sessiya
 CREATE UNIQUE INDEX one_open_session ON sessions(spot_id) WHERE left_at IS NULL;

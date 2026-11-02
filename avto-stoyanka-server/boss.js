@@ -35,6 +35,9 @@ export async function migrateBoss(pool) {
       period TEXT NOT NULL CHECK (period IN ('day', 'month', 'percent'))
     );`);
   await pool.query('INSERT INTO kv VALUES ($1, $2) ON CONFLICT (key) DO NOTHING', ['boss_key', crypto.randomBytes(18).toString('base64url')]);
+  // Nogironlar joylari: har oddiy zonaning kirishga eng yaqin 2 joyi (bir marta; keyin admin o'zgartiradi)
+  const seeded = await pool.query("INSERT INTO kv VALUES ('accessible_seeded', '1') ON CONFLICT (key) DO NOTHING RETURNING key");
+  if (seeded.rows[0]) await pool.query("UPDATE spots SET is_accessible = true WHERE NOT is_premium AND right(label, 2) IN ('01', '02')");
   // Har bir qorovul profili — xodim; moykachilar bir marta qo'shiladi
   await pool.query(`
     INSERT INTO staff (full_name, role, daily_wage, user_id)
@@ -96,7 +99,8 @@ export function mountBoss(app, pool, fail) {
           (SELECT COALESCE(SUM(fee), 0) FROM sessions WHERE NOT paid AND left_at >= ${startSql})::bigint AS unpaid,
           (SELECT COALESCE(round(avg(extract(epoch FROM left_at - entered_at)) / 60), 0)
              FROM sessions WHERE left_at >= ${startSql})::int AS avg_minutes,
-          (SELECT count(*) FROM sessions WHERE left_at IS NULL)::int AS inside`, [days]),
+          (SELECT count(*) FROM sessions WHERE left_at IS NULL)::int AS inside,
+          (SELECT count(*) FROM sessions WHERE disabled_driver AND entered_at >= ${startSql})::int AS disabled_free`, [days]),
       pool.query(`
         SELECT to_char(b, $2) AS label,
                (SELECT count(*) FROM sessions WHERE entered_at >= b AND entered_at < b + $3::interval)::int AS cars,

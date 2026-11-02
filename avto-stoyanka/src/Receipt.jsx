@@ -41,6 +41,7 @@ export default function Receipt({ receipt: r, onClose }) {
                 {hours > rows.length && <li><span>…</span><span /></li>}
               </ol>
             )}
+            {r.disabled_driver && <p className="t-free">♿ Nogironlar uchun bepul</p>}
             <p className="r-total"><span>{r.paid === false ? 'Qarz' : 'Jami'}</span><span>{money(r.fee)}</span></p>
             {r.ticket_no && <p className="r-guard">Kirish cheki {r.ticket_no} endi faol emas</p>}
             <p className="r-guard">Qorovul: {r.guard_out_name || '—'}</p>

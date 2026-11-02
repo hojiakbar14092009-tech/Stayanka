@@ -139,14 +139,15 @@ export function SpotsAdmin({ spots, reload }) {
         <div className="seg" role="group" aria-label="Nimani o'zgartirish">
           <button className={mode === 'is_disabled' ? 'on' : ''} onClick={() => setMode('is_disabled')}>Ta'mirga yopish</button>
           <button className={mode === 'is_premium' ? 'on' : ''} onClick={() => setMode('is_premium')}>Premium qilish</button>
+          <button className={mode === 'is_accessible' ? 'on' : ''} onClick={() => setMode('is_accessible')}>♿ Nogironlar joyi</button>
         </div>
       </div>
-      <p className="muted">Joyni bosing: {mode === 'is_disabled' ? "ta'mirga yopiladi yoki ochiladi" : "premium belgisi qo'yiladi yoki olinadi"}.</p>
+      <p className="muted">Joyni bosing: {mode === 'is_disabled' ? "ta'mirga yopiladi yoki ochiladi" : mode === 'is_premium' ? "premium belgisi qo'yiladi yoki olinadi" : 'nogironlar uchun (bepul) joy qilinadi yoki oddiy joyga qaytariladi'}.</p>
       <div className="chips">
         {spots.filter((s) => s.zone === zone).map((s) => (
           <button
             key={s.id}
-            className={`chip${s.is_busy ? ' busy' : ''}${s.is_disabled ? ' off' : ''}${s.is_premium ? ' premium' : ''}`}
+            className={`chip${s.is_busy ? ' busy' : ''}${s.is_disabled ? ' off' : ''}${s.is_premium ? ' premium' : ''}${s.is_accessible ? ' acc' : ''}`}
             onClick={() => toggle(s)}
             aria-pressed={s[mode]}
           >
