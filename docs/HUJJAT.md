@@ -109,7 +109,8 @@ Ishga tushirishdan keyin parollarni admin paneldan o'zgartiring.
 ## 9. Ishga tushirish
 
 ```bash
-# 1. PostgreSQL ishlab turishi kerak
+# 1. PostgreSQL ishlab turishi kerak, baza yaratiladi:
+psql -U postgres -c "CREATE DATABASE stoyanka;"
 cd avto-stoyanka-server
 npm install
 copy .env.example .env      # DATABASE_URL ni to'g'rilang

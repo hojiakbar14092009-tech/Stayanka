@@ -1,0 +1,33 @@
+# AvtoStoyanka
+
+200 joyli avtoturargoh uchun qorovul paneli va admin panel.
+Node.js + Express + PostgreSQL server, Vite + React frontend, Three.js 3D darvoza.
+
+To'liq hujjat: [docs/HUJJAT.md](docs/HUJJAT.md)
+
+## Tez ishga tushirish
+
+```bash
+psql -U postgres -c "CREATE DATABASE stoyanka;"
+
+cd avto-stoyanka-server
+npm install
+copy .env.example .env     # DATABASE_URL dagi parolni o'zingiznikiga almashtiring
+npm run init-db
+npm start                  # http://localhost:3000
+
+cd ../avto-stoyanka
+npm install
+npm run dev                # http://localhost:5173
+```
+
+Kirish: `admin / admin123`, qorovullar: `aziz / qorovul1`, `bekzod / qorovul2`, `dilshod / qorovul3`.
+
+## Imkoniyatlar
+
+- 5 zona × 40 = 200 joy, A zona — Premium
+- Raqamni yozib Enter: keyingi bo'sh joy avtomatik tanlanadi
+- Vaqt o'tgan sari narx oshadi: har keyingi soat qimmatroq
+- Chiqishda chek printerdan chiqqandek animatsiya bilan chiqadi, arxivda saqlanadi
+- Mashina kirsa yoki chiqsa, hamma ochiq panelga xabar keladi va 3D darvoza ochiladi
+- Admin: statistika, joylarni ta'mirga yopish va premium qilish, tarif, qorovul profillari
