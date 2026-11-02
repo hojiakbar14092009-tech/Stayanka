@@ -133,10 +133,10 @@ function buildCar() {
 // ---------- Qorovul: tizza va tirsakli skelet, yumaloq (kapsula) a'zolar, yuz ----------
 const capsule = (r, len, material, pos) => mesh(new THREE.CapsuleGeometry(r, len, 6, 14), material, pos);
 
-function buildGuard() {
+function buildGuard(o) {
   const g = new THREE.Group();
-  const skin = mat(0xe8b98f, { roughness: 0.6 });
-  const uniform = mat(0x24448f, { roughness: 0.8 });
+  const skin = mat(o.skin, { roughness: 0.6 });
+  const uniform = mat(o.uniform, { roughness: 0.8 });
   const pants = mat(0x232a38, { roughness: 0.85 });
   const dark = mat(0x111111, { roughness: 0.5 });
   const hips = new THREE.Group();
@@ -165,7 +165,7 @@ function buildGuard() {
   torso.position.y = 0.06;
   hips.add(torso);
   const chest = capsule(0.17, 0.32, uniform, { y: 0.36 });
-  chest.scale.set(0.85, 1, 1.4);
+  chest.scale.set(0.85 * o.girth, 1, 1.4 * Math.sqrt(o.girth)); // gavda
   torso.add(chest);
   const vest = mat(0xf2c230, { emissive: 0xf2c230, emissiveIntensity: 0.25, roughness: 0.6 });
   const strip = mat(0xdfe3ea, { emissive: 0xdfe3ea, emissiveIntensity: 0.35 });
@@ -174,8 +174,13 @@ function buildGuard() {
     b.scale.set(0.155, 1, 0.245);
     torso.add(b);
   };
-  band(0.42, vest, 0.1);
-  band(0.31, strip, 0.05);
+  if (o.vest) {
+    band(0.42, vest, 0.1);
+    band(0.31, strip, 0.05);
+  } else {
+    torso.add(box(0.02, 0.5, 0.012, mat(0xd9b44a, { metalness: 0.8 }), { x: 0.15 * o.girth, y: 0.35, shadow: false })); // tugmalar chizig'i
+    for (const z of [-0.2, 0.2]) torso.add(box(0.22, 0.03, 0.14, mat(0xd9b44a, { metalness: 0.7 }), { y: 0.6, z })); // pogon
+  }
   band(0.08, dark, 0.05); // kamar
   torso.add(box(0.03, 0.05, 0.06, mat(0xd9b44a, { metalness: 0.8, roughness: 0.3 }), { x: 0.15, y: 0.08 })); // to'qa
   torso.add(box(0.02, 0.07, 0.06, mat(0xd9b44a, { metalness: 0.8, roughness: 0.3 }), { x: 0.15, y: 0.5, z: -0.09 })); // nishon
@@ -195,10 +200,10 @@ function buildGuard() {
     head.add(e);
     return e;
   });
-  for (const z of [-0.05, 0.05]) head.add(box(0.02, 0.012, 0.05, mat(0x3a2a20), { x: 0.13, y: 0.065, z, shadow: false })); // qosh
+  for (const z of [-0.05, 0.05]) head.add(box(0.02, 0.014, 0.05, mat(o.brows), { x: 0.13, y: 0.065, z, shadow: false })); // qosh
   head.add(mesh(new THREE.SphereGeometry(0.022, 8, 6), skin, { x: 0.145, y: -0.01 })); // burun
-  head.add(box(0.025, 0.02, 0.09, mat(0x3a2a20), { x: 0.135, y: -0.05, shadow: false })); // mo'ylov
-  head.add(mesh(new THREE.CylinderGeometry(0.15, 0.155, 0.08, 24), mat(0x1b2a55), { y: 0.12 }));
+  if (o.mustache) head.add(box(0.03, 0.028, 0.11, mat(o.mustache), { x: 0.138, y: -0.05, shadow: false })); // mo'ylov
+  head.add(mesh(new THREE.CylinderGeometry(0.15, 0.155, 0.08, 24), mat(o.cap), { y: 0.12 }));
   head.add(mesh(new THREE.CylinderGeometry(0.155, 0.155, 0.02, 24), mat(0x0f1733), { y: 0.085 }));
   const visor = box(0.14, 0.015, 0.24, dark, { x: 0.15, y: 0.09 });
   visor.rotation.z = -0.2;
@@ -240,6 +245,19 @@ function poseGuard(guard, mode, time, dt, lookAt) {
     T.bob = Math.abs(Math.cos(p)) * 0.035;
     T.twist = Math.sin(p) * 0.1;
     T.lean = 0.05;
+  } else if (mode === 'sit' || mode === 'sitwave') {
+    // stulda: son gorizontal, boldir pastga, qo'llar stolda; vaqti-vaqti bilan klaviaturada yozadi
+    T.th = [Math.PI / 2, Math.PI / 2];
+    T.kn = [Math.PI / 2, Math.PI / 2];
+    const typing = Math.sin(time * 0.5) > 0.3 ? Math.sin(time * 18) * 0.06 : 0;
+    T.up = [[0.75, 0.15], [0.75 + typing, -0.15]];
+    T.el = [[0.85, 0], [0.85 - typing, 0]];
+    T.lean = 0.08;
+    if (mode === 'sitwave') {
+      T.up[1] = [0.3, -2.5];
+      T.el[1] = [0, -0.35 + Math.sin(time * 9) * 0.45];
+      T.lean = 0;
+    }
   } else if (mode === 'wave') {
     T.up[1] = [0.2, -2.55]; // o'ng qo'l yon tomondan tepaga
     T.el[1] = [0, -0.35 + Math.sin(time * 9) * 0.45];
@@ -272,7 +290,8 @@ function poseGuard(guard, mode, time, dt, lookAt) {
   u.torso.rotation.z = lerp(u.torso.rotation.z, -T.lean, k);
   u.torso.rotation.y = lerp(u.torso.rotation.y, T.twist, k);
   u.torso.scale.y = 1 + Math.sin(time * 1.6) * 0.01; // nafas
-  u.hips.position.y = lerp(u.hips.position.y, 0.92 + T.bob - (mode === 'shout' ? 0.03 : 0), k);
+  const sitting = mode === 'sit' || mode === 'sitwave';
+  u.hips.position.y = lerp(u.hips.position.y, sitting ? 0.5 : 0.92 + T.bob - (mode === 'shout' ? 0.03 : 0), k);
   u.hips.position.z = lerp(u.hips.position.z, T.sway, Math.min(1, dt * 3));
 
   // Ko'z qisish
@@ -308,147 +327,264 @@ function driveCar(car, x, z, dt) {
   u.tail.emissiveIntensity = lerp(u.tail.emissiveIntensity, braking ? 2.2 : 0.4, Math.min(1, dt * 10));
 }
 
-// ---------- Ssenariylar: t (soniya) → mashina, shlagbaum, qorovul holati ----------
-const HOME = new THREE.Vector3(2.3, 0, -2.55);
-// To'xtash nuqtalari: oldingi bamper shlagbaumdan ~2 m oldin, kamera raqamni ko'radigan joyda
-const STOP_IN = -3.5;
-const STOP_OUT = 3.5;
-const approach = (t, from, to) => lerp(from, to, 1 - (1 - seg(t, 0, 2.2)) ** 2.4); // sekinlab to'xtaydi
-const depart = (t, from, to, t0) => lerp(from, to, seg(t, t0, t0 + 3) ** 2); // asta tezlanadi
+// ---------- Joylashuv ----------
+// Ikki yo'lak: kirish (z < 0, chapdan o'ngga) va chiqish (z > 0, o'ngdan chapga), o'rtada orolcha va budka.
+const ISLAND = 1.5; // orolcha yarim kengligi
+const LANE_IN = -3.15;
+const LANE_OUT = 3.15;
+const ROAD_EDGE = 4.85;
+const BOOTH = { x: 2.1, w: 2.6, d: 1.9 }; // budka orolchada, shlagbaumdan keyin
+const STOP_IN = -3.4; // kirish: oldingi bamper stop chizig'ida
+const STOP_OUT = 3.4;
+const CAM_IN = new THREE.Vector3(1.25, 0.75, -1.4); // raqam kameralari shlagbaumdan keyin, past — qanot to'smaydi
+const CAM_OUT = new THREE.Vector3(-1.25, 0.75, 1.4);
+const SEAT = new THREE.Vector3(BOOTH.x - 0.55, 0, 0.1); // budkadagi qorovul stuli (kirish tomon oynaga qaragan)
+const HOME = new THREE.Vector3(BOOTH.x + BOOTH.w / 2 + 0.7, 0, 0.45); // tashqaridagi qorovul joyi
+const SHOUT_SPOT = new THREE.Vector3(3.7, 0, ISLAND + 0.25);
 
-// Kamera o'qishi uchun mashina shlagbaum oldida kutadi — qorovul "Kirgizish"ni bosguncha
+// ---------- Ssenariylar: t (soniya) → mashina, shlagbaum, qorovullar holati ----------
+const approach = (t, from, to) => lerp(from, to, 1 - (1 - seg(t, 0, 2.4)) ** 2.4); // sekinlab to'xtaydi
+const depart = (t, from, to, t0) => lerp(from, to, seg(t, t0, t0 + 3.2) ** 2); // asta tezlanadi
+const idleCrew = { seat: 'sit', guard: { pos: HOME, mode: 'idle' } };
+
+// Kamera o'qishi uchun mashina shlagbaum oldida kutadi — qorovul chekni berguncha
 function arriveScene(t) {
-  return {
-    car: { x: approach(t, -15, STOP_IN), z: -0.95, rot: 0 }, done: false, hold: true, cam: 'in',
-    lift: 0, guard: { pos: HOME, mode: 'idle' }, say: null,
-  };
+  return { ...idleCrew, car: { x: approach(t, -16, STOP_IN), z: LANE_IN, rot: 0 }, done: false, hold: true, cam: 'in', lift: 0 };
 }
 
 function enterScene(t) {
-  const x = t < 2.2 ? approach(t, -15, STOP_IN) : depart(t, STOP_IN, 16, 3.2);
+  const x = t < 2.4 ? approach(t, -16, STOP_IN) : depart(t, STOP_IN, 17, 3.4);
   return {
-    car: { x, z: -0.95, rot: 0 }, done: t > 6.4, cam: t < 3.4 ? 'in' : null,
-    lift: smooth(seg(t, 2.2, 3.1)) - smooth(seg(t, 4.6, 5.6)),
-    guard: { pos: HOME, mode: t > 2.0 && t < 4.4 ? 'wave' : 'idle' },
-    say: t > 2.1 && t < 4.2 ? 'Xush kelibsiz!' : null,
+    ...idleCrew, car: { x, z: LANE_IN, rot: 0 }, done: t > 6.8, cam: t < 2.4 ? 'in' : null,
+    lift: smooth(seg(t, 2.4, 3.3)) - smooth(seg(t, 5.0, 6.0)),
+    seat: t > 2.2 && t < 4.6 ? 'sitwave' : 'sit', say: t > 2.3 && t < 4.4 ? 'Xush kelibsiz!' : null, speaker: 'seat',
   };
 }
 
 function exitScene(t) {
-  const x = t < 2.2 ? approach(t, 15, STOP_OUT) : depart(t, STOP_OUT, -16, 3.2);
+  const x = t < 2.4 ? approach(t, 16, STOP_OUT) : depart(t, STOP_OUT, -17, 3.4);
   return {
-    car: { x, z: 0.95, rot: Math.PI }, done: t > 6.4, cam: t < 3.4 ? 'out' : null,
-    lift: smooth(seg(t, 2.2, 3.1)) - smooth(seg(t, 4.6, 5.6)),
-    guard: { pos: HOME, mode: t > 2.0 && t < 4.4 ? 'wave' : 'idle' },
-    say: t > 2.1 && t < 4.2 ? "Oq yo'l!" : null,
+    ...idleCrew, car: { x, z: LANE_OUT, rot: Math.PI }, done: t > 6.8, cam: t < 2.4 ? 'out' : null,
+    lift: smooth(seg(t, 2.4, 3.3)) - smooth(seg(t, 5.0, 6.0)),
+    guard: { pos: HOME, mode: t > 2.2 && t < 4.6 ? 'wave' : 'idle' }, say: t > 2.3 && t < 4.4 ? "Oq yo'l!" : null, speaker: 'guard',
   };
 }
 
-// To'lay olmadi: qorovul mashinaga yurib boradi, baqiradi, shlagbaum ochiladi, mashina qochadi, qorovul qaytadi
-const SHOUT_SPOT = new THREE.Vector3(3.6, 0, -0.1);
+// Kiritib bo'lmadi: kutib turgan mashina orqaga yurib ketadi
+function rejectScene(t) {
+  return {
+    ...idleCrew, car: { x: lerp(STOP_IN, -16, smooth(seg(t, 0.8, 4.8))), z: LANE_IN, rot: 0 }, done: t > 5, cam: t < 1.5 ? 'in' : null,
+    lift: 0, seat: t < 2.6 ? 'sitwave' : 'sit', say: t < 2.6 ? "Kechirasiz, joy yo'q" : null, speaker: 'seat',
+  };
+}
+
+// To'lay olmadi: tashqaridagi qorovul mashinaga yurib boradi, baqiradi, shlagbaum ochiladi, mashina qochadi, qorovul qaytadi
 function expelScene(t) {
-  const x = t < 2.0 ? lerp(15, 3.4, 1 - (1 - seg(t, 0, 2.0)) ** 2.4)
-    : t < 6.2 ? 3.4 + Math.sin(t * 40) * 0.012 * seg(t, 5.2, 6.2) // dvigatel o'kirib titraydi
-      : lerp(3.4, -18, seg(t, 6.2, 7.8) ** 1.6);
+  const x = t < 2.2 ? lerp(16, STOP_OUT, 1 - (1 - seg(t, 0, 2.2)) ** 2.4)
+    : t < 6.4 ? STOP_OUT + Math.sin(t * 40) * 0.012 * seg(t, 5.4, 6.4) // dvigatel o'kirib titraydi
+      : lerp(STOP_OUT, -19, seg(t, 6.4, 8.0) ** 1.6);
   let pos;
   let mode = 'idle';
   if (t >= 1.4 && t < 3.0) { pos = HOME.clone().lerp(SHOUT_SPOT, smooth(seg(t, 1.4, 3.0))); mode = 'walk'; }
-  else if (t >= 3.0 && t < 8.4) { pos = SHOUT_SPOT; mode = 'shout'; }
-  else if (t >= 8.4 && t < 10.2) { pos = SHOUT_SPOT.clone().lerp(HOME, smooth(seg(t, 8.4, 10.2))); mode = 'walk'; }
+  else if (t >= 3.0 && t < 8.6) { pos = SHOUT_SPOT; mode = 'shout'; }
+  else if (t >= 8.6 && t < 10.4) { pos = SHOUT_SPOT.clone().lerp(HOME, smooth(seg(t, 8.6, 10.4))); mode = 'walk'; }
   else pos = HOME;
   return {
-    car: { x, z: 0.95, rot: Math.PI }, done: t > 10.6, cam: t < 3 ? 'out' : null,
-    lift: smooth(seg(t, 5.6, 6.3)) - smooth(seg(t, 8.0, 8.9)),
-    guard: { pos, mode },
-    say: t > 3.0 && t < 8.6 ? GRAWLIX[Math.floor(t * 2.2) % GRAWLIX.length] : null,
-    angry: true,
-  };
-}
-function rejectScene(t) {
-  return {
-    car: { x: lerp(STOP_IN, -16, smooth(seg(t, 0.6, 4.5))), z: -0.95, rot: 0 }, done: t > 4.6, cam: t < 1.5 ? 'in' : null,
-    lift: 0, guard: { pos: HOME, mode: t < 2.5 ? 'wave' : 'idle' }, say: t < 2.4 ? 'Kechirasiz, joy yo\'q' : null,
+    car: { x, z: LANE_OUT, rot: Math.PI }, done: t > 10.8, cam: t < 3 ? 'out' : null,
+    lift: smooth(seg(t, 5.8, 6.5)) - smooth(seg(t, 8.2, 9.1)),
+    seat: 'sit', guard: { pos, mode }, speaker: 'guard',
+    say: t > 3.0 && t < 8.8 ? GRAWLIX[Math.floor(t * 2.2) % GRAWLIX.length] : null, angry: true,
   };
 }
 const SCENES = { reject: rejectScene, arrive: arriveScene, enter: enterScene, exit: exitScene, expel: expelScene };
 
-// Raqam kameralari: yo'l chetida, shlagbaumdan oldin, 1,3 m balandlikda — qanot raqamni to'smaydi.
-// Kirish kamerasi shlagbaumning chap tomonida (chapdan kelayotgan mashinaga qaraydi), chiqishniki o'ngda.
-const CAM_X = 0.5;
-const CAM_Z = -2.25;
+// Yozuvli tekstura (yo'l belgilari, budka peshlavhasi)
+function textTexture(text, { w = 512, h = 128, bg = null, fg = '#fff', font = 'bold 72px Arial' } = {}) {
+  const c = document.createElement('canvas');
+  c.width = w;
+  c.height = h;
+  const g = c.getContext('2d');
+  if (bg) {
+    g.fillStyle = bg;
+    g.fillRect(0, 0, w, h);
+  }
+  g.fillStyle = fg;
+  g.font = font;
+  g.textAlign = 'center';
+  g.textBaseline = 'middle';
+  g.fillText(text, w / 2, h / 2 + 4);
+  const t = new THREE.CanvasTexture(c);
+  t.colorSpace = THREE.SRGBColorSpace;
+  t.anisotropy = 4;
+  return t;
+}
+const decal = (tex, w, h, x, z, rotZ = 0) => {
+  const m = new THREE.Mesh(new THREE.PlaneGeometry(w, h), new THREE.MeshStandardMaterial({ map: tex, transparent: true, roughness: 0.9, depthWrite: false }));
+  m.rotation.set(-Math.PI / 2, 0, rotZ);
+  m.position.set(x, 0.012, z);
+  m.receiveShadow = true;
+  return m;
+};
+
+// Shlagbaum: shkaf-ustun, qarshi yuk, chiziqli qanot, uchida tayanch, ogohlantirish chirog'i.
+// side = -1: qanot -z tomonga (kirish yo'lagi), +1: +z tomonga (chiqish yo'lagi)
+function buildBarrier(scene, side) {
+  const z0 = side * (ISLAND - 0.25);
+  const cabinet = mesh(new THREE.BoxGeometry(0.42, 1.05, 0.36), mat(0xf2c230, { roughness: 0.45 }), { y: 0.6, z: z0 });
+  scene.add(cabinet);
+  scene.add(box(0.36, 0.08, 0.3, mat(0x2a2c30), { y: 1.16, z: z0 })); // qopqoq
+  scene.add(box(0.44, 0.12, 0.38, mat(0x2a2c30), { y: 0.1, z: z0 })); // poydevor
+  const beacon = mesh(new THREE.SphereGeometry(0.07, 14, 10), mat(0xff8a00, { emissive: 0xff8a00, emissiveIntensity: 0.2 }), { y: 1.36, z: z0, shadow: false });
+  scene.add(beacon);
+
+  const pivot = new THREE.Group();
+  pivot.position.set(0, 1.0, z0);
+  pivot.add(box(0.22, 0.2, 0.45, mat(0x3a3d43, { metalness: 0.5, roughness: 0.4 }), { z: -side * 0.32 })); // qarshi yuk
+  // Qanot: oq-qizil chiziqli quvur (bitta tekstura)
+  const len = ROAD_EDGE - ISLAND + 0.1;
+  const c = document.createElement('canvas');
+  c.width = 512;
+  c.height = 16;
+  const g = c.getContext('2d');
+  for (let i = 0; i < 8; i++) {
+    g.fillStyle = i % 2 ? '#ffffff' : '#e5484d';
+    g.fillRect(i * 64, 0, 64, 16);
+  }
+  const stripes = new THREE.CanvasTexture(c);
+  stripes.colorSpace = THREE.SRGBColorSpace;
+  const arm = mesh(new THREE.CylinderGeometry(0.045, 0.055, len, 16), new THREE.MeshStandardMaterial({ map: stripes, roughness: 0.35 }), { z: side * (len / 2 + 0.1) });
+  arm.rotation.x = Math.PI / 2;
+  stripes.rotation = Math.PI / 2;
+  stripes.center.set(0.5, 0.5);
+  pivot.add(arm);
+  for (let i = 1; i < 6; i++) pivot.add(mesh(new THREE.SphereGeometry(0.03, 8, 6), mat(0xff3b3b, { emissive: 0xff3b3b, emissiveIntensity: 0.8 }), { y: 0.06, z: side * (0.2 + i * len / 6), shadow: false }));
+  scene.add(pivot);
+  // Qanot uchi tayanchi (yo'l chetida)
+  const restZ = side * (ROAD_EDGE - 0.15);
+  scene.add(box(0.08, 0.92, 0.08, mat(0xf2c230), { y: 0.46, z: restZ }));
+  scene.add(box(0.2, 0.06, 0.08, mat(0x2a2c30), { y: 0.95, z: restZ }));
+  return { pivot, beacon, side };
+}
+
+// Qorovul budkasi: pastki qismi g'isht-panel, yuqorisi oyna, ichida stol, monitor, stul, chiroq
+function buildBooth(scene) {
+  const { x, w, d } = BOOTH;
+  const wall = mat(0xd9d6cf, { roughness: 0.8 });
+  const trim = mat(0x6f7378, { metalness: 0.4, roughness: 0.4 });
+  const glass = new THREE.MeshStandardMaterial({ color: 0xa9cfff, transparent: true, opacity: 0.18, roughness: 0.05, metalness: 0.2, depthWrite: false });
+  const g = new THREE.Group();
+  g.position.set(x, 0.15, 0);
+  scene.add(g);
+  g.add(box(w + 0.1, 0.08, d + 0.1, mat(0x8d8f93), { y: 0.04 })); // pol
+  // pastki devorlar (eshik +x tomonda)
+  g.add(box(0.08, 1.0, d, wall, { x: -w / 2, y: 0.54 }));
+  g.add(box(w, 1.0, 0.08, wall, { y: 0.54, z: -d / 2 }));
+  g.add(box(w, 1.0, 0.08, wall, { y: 0.54, z: d / 2 }));
+  g.add(box(0.08, 1.0, d * 0.35, wall, { x: w / 2, y: 0.54, z: -d * 0.325 }));
+  // yuqori oynalar
+  for (const [gw, gd, gx, gz] of [[0.02, d, -w / 2, 0], [w, 0.02, 0, -d / 2], [w, 0.02, 0, d / 2], [0.02, d * 0.35, w / 2, -d * 0.325]]) {
+    g.add(mesh(new THREE.BoxGeometry(gw, 1.05, gd), glass, { x: gx, y: 1.57, z: gz, shadow: false }));
+  }
+  // ustunlar va oyna romlari
+  for (const [px, pz] of [[-w / 2, -d / 2], [w / 2, -d / 2], [-w / 2, d / 2], [w / 2, d / 2], [w / 2, 0.3]]) g.add(box(0.08, 2.1, 0.08, trim, { x: px, y: 1.09, z: pz }));
+  g.add(box(w, 0.05, 0.1, trim, { y: 1.05, z: -d / 2 }));
+  g.add(box(w, 0.05, 0.1, trim, { y: 1.05, z: d / 2 }));
+  g.add(box(0.1, 0.05, d, trim, { x: -w / 2, y: 1.05 }));
+  // tom: chiqib turuvchi, ko'k peshtoq va yozuv
+  g.add(box(w + 0.6, 0.12, d + 0.6, mat(0xe8e6e0), { y: 2.2 }));
+  g.add(box(w + 0.62, 0.2, d + 0.62, mat(0x2257d6), { y: 2.08 }));
+  const sign = textTexture("QO'RIQLASH POSTI", { w: 1024, h: 96, font: 'bold 64px Arial' });
+  for (const [z, ry] of [[d / 2 + 0.32, 0], [-d / 2 - 0.32, Math.PI]]) {
+    const p = mesh(new THREE.PlaneGeometry(w + 0.4, 0.17), new THREE.MeshStandardMaterial({ map: sign, transparent: true, emissive: 0xffffff, emissiveMap: sign, emissiveIntensity: 0.6 }), { y: 2.08, z, shadow: false });
+    p.rotation.y = ry;
+    g.add(p);
+  }
+  // ichki jihozlar: stol, monitor, stul, chiroq
+  const desk = mat(0x8a6a4a, { roughness: 0.6 });
+  g.add(box(0.55, 0.05, d - 0.3, desk, { x: -w / 2 + 0.35, y: 0.78 }));
+  g.add(box(0.05, 0.74, d - 0.3, desk, { x: -w / 2 + 0.12, y: 0.42 }));
+  const monitor = box(0.04, 0.32, 0.5, mat(0x15171a), { x: -w / 2 + 0.3, y: 1.02, z: 0.35 });
+  monitor.rotation.y = 0.35;
+  monitor.add(box(0.005, 0.27, 0.44, mat(0x2a6fdb, { emissive: 0x3a7fff, emissiveIntensity: 0.9 }), { x: 0.025 }));
+  g.add(monitor);
+  g.add(box(0.2, 0.03, 0.3, mat(0x2a2c30), { x: -w / 2 + 0.42, y: 0.81, z: -0.15 })); // klaviatura
+  const chair = mat(0x2a2c30, { roughness: 0.6 });
+  g.add(box(0.46, 0.07, 0.46, chair, { x: SEAT.x - x + 0.05, y: 0.42, z: SEAT.z }));
+  g.add(box(0.07, 0.55, 0.44, chair, { x: SEAT.x - x + 0.3, y: 0.72, z: SEAT.z }));
+  g.add(mesh(new THREE.CylinderGeometry(0.03, 0.03, 0.36, 8), trim, { x: SEAT.x - x + 0.05, y: 0.22, z: SEAT.z }));
+  const lamp = new THREE.PointLight(0xffe2b0, 3, 4, 1.5);
+  lamp.position.set(0, 1.9, 0);
+  g.add(lamp);
+}
 
 function buildWorld(scene) {
-  const ground = mesh(new THREE.PlaneGeometry(60, 30), mat(0x2b2e33, { roughness: 1 }), { shadow: false });
+  // Asfalt, maysa, trotuarlar
+  const ground = mesh(new THREE.PlaneGeometry(70, 40), mat(0x3f5a3a, { roughness: 1 }), { shadow: false });
   ground.rotation.x = -Math.PI / 2;
   scene.add(ground);
-  const yellow = mat(0xf2c230);
-  const white = mat(0xeceae4);
-  for (let x = -20; x < 20; x += 2.4) scene.add(box(1.2, 0.01, 0.12, yellow, { x, y: 0.005, shadow: false }));
-  for (const z of [-2.0, 2.0]) scene.add(box(40, 0.01, 0.08, white, { y: 0.006, z, shadow: false }));
-  scene.add(box(0.25, 0.01, 2, white, { x: -1.5, y: 0.007, z: -1, shadow: false }));
-  scene.add(box(0.25, 0.01, 2, white, { x: 1.5, y: 0.007, z: 1, shadow: false }));
-
-  // Bordyur, trotuar, maysa
-  for (const z of [-2.35, 2.35]) scene.add(box(40, 0.14, 0.3, mat(0x8d8f93), { y: 0.07, z }));
-  scene.add(box(40, 0.1, 2.2, mat(0x5b5e63), { y: 0.05, z: -3.6 }));
-  scene.add(box(40, 0.08, 4, mat(0x3f5a3a, { roughness: 1 }), { y: 0.04, z: 4.6 }));
+  const asphalt = mat(0x2b2e33, { roughness: 0.95 });
+  const road = mesh(new THREE.BoxGeometry(44, 0.02, ROAD_EDGE * 2), asphalt, { y: 0.01, shadow: false });
+  scene.add(road);
+  const white = mat(0xeceae4, { roughness: 0.8 });
+  const yellow = mat(0xf2c230, { roughness: 0.7 });
+  for (const z of [-ROAD_EDGE - 0.15, ROAD_EDGE + 0.15]) scene.add(box(44, 0.16, 0.3, mat(0x8d8f93), { y: 0.08, z }));
+  for (const z of [-ROAD_EDGE - 1.4, ROAD_EDGE + 1.4]) scene.add(box(44, 0.12, 2.2, mat(0x5b5e63), { y: 0.06, z }));
+  // Yo'lak chiziqlari va stop chiziqlari
+  for (const z of [-(ISLAND + 0.15), ISLAND + 0.15, -(ROAD_EDGE - 0.2), ROAD_EDGE - 0.2]) {
+    for (let x = -21; x < 21; x += 2) scene.add(box(1.1, 0.01, 0.1, white, { x, y: 0.022, z, shadow: false }));
+  }
+  scene.add(box(0.3, 0.01, ROAD_EDGE - ISLAND, white, { x: -1.2, y: 0.023, z: -(ROAD_EDGE + ISLAND) / 2, shadow: false }));
+  scene.add(box(0.3, 0.01, ROAD_EDGE - ISLAND, white, { x: 1.2, y: 0.023, z: (ROAD_EDGE + ISLAND) / 2, shadow: false }));
+  // Yo'ldagi yozuvlar va o'qlar
+  const inTex = textTexture('KIRISH  →', { font: 'bold 84px Arial' });
+  const outTex = textTexture('←  CHIQISH', { font: 'bold 84px Arial' });
+  scene.add(decal(inTex, 3.6, 0.9, -7, LANE_IN, 0));
+  scene.add(decal(outTex, 3.6, 0.9, 7, LANE_OUT, 0));
+  // Orolcha: bordyurli, ichida maysa, uchlari sariq-qora
+  scene.add(box(13, 0.16, ISLAND * 2, mat(0x9a9c9f), { x: 0.5, y: 0.08 }));
+  scene.add(box(12.4, 0.17, ISLAND * 2 - 0.4, mat(0x6f7477), { x: 0.5, y: 0.085 }));
+  for (const end of [-6, 7]) for (let i = 0; i < 6; i++) scene.add(box(0.2, 0.17, 0.5, i % 2 ? yellow : mat(0x15171a), { x: end, y: 0.09, z: -1.25 + i * 0.5 }));
+  // Daraxtlar, chiroq ustunlari
   const leaf = mat(0x47704a, { flatShading: true });
-  for (const [x, z, s] of [[-7, 4.2, 1], [9, 6.2, 1.1], [-3, 5.4, 0.8], [12, 4.4, 0.9]]) {
+  for (const [x, z, s] of [[-9, 7.4, 1], [10, 7.8, 1.1], [-3, 8.4, 0.8], [-12, -7.6, 1], [5, -8, 0.9]]) {
     scene.add(mesh(new THREE.CylinderGeometry(0.08, 0.12, 1.1, 8), mat(0x5a4030), { x, y: 0.55, z }));
     const crown = mesh(new THREE.IcosahedronGeometry(0.75 * s, 0), leaf, { x, y: 1.5 * s + 0.4, z });
     crown.rotation.set(x, z, 0);
     scene.add(crown);
   }
-  for (const x of [-6, 5]) {
-    scene.add(box(0.1, 3.2, 0.1, mat(0x6f7378), { x, y: 1.6, z: -2.7 }));
-    scene.add(box(0.7, 0.06, 0.18, mat(0x6f7378), { x: x + 0.3, y: 3.2, z: -2.6 }));
-    scene.add(box(0.3, 0.04, 0.14, mat(0xfff1c8, { emissive: 0xfff1c8, emissiveIntensity: 2 }), { x: x + 0.5, y: 3.16, z: -2.6, shadow: false }));
-    const lamp = new THREE.PointLight(0xffd9a0, 6, 7, 1.6);
-    lamp.position.set(x + 0.5, 3, -2.4);
-    scene.add(lamp);
+  for (const [x, z] of [[-6.5, 0], [8, 0]]) {
+    scene.add(box(0.1, 3.4, 0.1, mat(0x6f7378), { x, y: 1.85, z }));
+    for (const s of [-1, 1]) {
+      scene.add(box(0.12, 0.05, 1.1, mat(0x6f7378), { x, y: 3.5, z: z + s * 0.55 }));
+      scene.add(box(0.2, 0.04, 0.3, mat(0xfff1c8, { emissive: 0xfff1c8, emissiveIntensity: 2 }), { x, y: 3.46, z: z + s * 1.05, shadow: false }));
+      const lamp = new THREE.PointLight(0xffd9a0, 5, 8, 1.6);
+      lamp.position.set(x, 3.3, z + s * 1.4);
+      scene.add(lamp);
+    }
   }
+  // "P" belgisi kirishda
+  const pTex = textTexture('P', { w: 128, h: 128, bg: '#2257d6', font: 'bold 96px Arial' });
+  scene.add(box(0.08, 2.8, 0.08, mat(0x8a8f96), { x: -4.2, y: 1.4, z: -ROAD_EDGE - 0.6 }));
+  scene.add(mesh(new THREE.PlaneGeometry(0.9, 0.9), new THREE.MeshStandardMaterial({ map: pTex }), { x: -4.2, y: 2.85, z: -ROAD_EDGE - 0.55 }));
 
-  // Budka va "P" belgisi
-  scene.add(box(1.4, 1.9, 1.4, mat(0xd9d6cf), { x: 0.4, y: 0.95, z: -3.4 }));
-  scene.add(box(1.8, 0.14, 1.8, mat(0x2257d6), { x: 0.4, y: 1.97, z: -3.4 }));
-  scene.add(box(0.02, 0.7, 1, mat(0x9fc3ff, { roughness: 0.05, metalness: 0.3, emissive: 0x334466, emissiveIntensity: 0.4 }), { x: 1.11, y: 1.25, z: -3.4 }));
-  scene.add(box(0.08, 2.8, 0.08, mat(0x8a8f96), { x: -2.4, y: 1.4, z: -2.8 }));
-  const c = document.createElement('canvas');
-  c.width = c.height = 128;
-  const g = c.getContext('2d');
-  g.fillStyle = '#2257d6';
-  g.fillRect(0, 0, 128, 128);
-  g.strokeStyle = '#fff';
-  g.lineWidth = 8;
-  g.strokeRect(10, 10, 108, 108);
-  g.fillStyle = '#fff';
-  g.font = 'bold 92px Arial';
-  g.textAlign = 'center';
-  g.fillText('P', 64, 98);
-  const signTex = new THREE.CanvasTexture(c);
-  signTex.colorSpace = THREE.SRGBColorSpace;
-  scene.add(mesh(new THREE.PlaneGeometry(0.9, 0.9), new THREE.MeshStandardMaterial({ map: signTex }), { x: -2.4, y: 2.85, z: -2.75 }));
-
-  // Raqam o'qiydigan kamera ustuni (ikkita kamera: kirish va chiqish tomonga)
-  for (const dir of [1, -1]) {
-    scene.add(box(0.07, 1.3, 0.07, mat(0x6f7378), { x: -dir * CAM_X, y: 0.65, z: CAM_Z - 0.05 }));
-    const cam = box(0.3, 0.13, 0.13, mat(0xe9eaec), { x: -dir * CAM_X, y: 1.36, z: CAM_Z });
-    cam.rotation.y = dir > 0 ? -0.5 : Math.PI + 0.5;
-    cam.add(box(0.03, 0.08, 0.08, mat(0x111111, { emissive: 0x223355, emissiveIntensity: 0.6 }), { x: -0.16 }));
+  // Raqam kameralari (past ustun, mashinaga qaragan)
+  for (const [p, face] of [[CAM_IN, -1], [CAM_OUT, 1]]) {
+    scene.add(box(0.07, p.y, 0.07, mat(0x6f7378), { x: p.x, y: p.y / 2 + 0.15, z: p.z }));
+    const cam = box(0.28, 0.12, 0.12, mat(0xe9eaec), { x: p.x, y: p.y + 0.2, z: p.z });
+    cam.rotation.y = face < 0 ? -0.45 : Math.PI - 0.45;
+    cam.add(box(0.03, 0.07, 0.07, mat(0x111111, { emissive: 0x223355, emissiveIntensity: 0.6 }), { x: -0.15 }));
     scene.add(cam);
   }
 
-  // Shlagbaum: ustun, qarshi yuk, qizil-oq qanot
-  scene.add(box(0.36, 1.1, 0.36, yellow, { y: 0.55, z: -2.5 }));
-  const pivot = new THREE.Group();
-  pivot.position.set(0, 1.0, -2.5);
-  pivot.add(box(0.2, 0.2, 0.5, mat(0x3a3d43), { z: -0.35 }));
-  for (let i = 0; i < 8; i++) pivot.add(box(0.1, 0.1, 0.56, mat(i % 2 ? 0xffffff : 0xe5484d), { z: 0.3 + i * 0.56 }));
-  scene.add(pivot);
-  return pivot;
+  buildBooth(scene);
+  return [buildBarrier(scene, -1), buildBarrier(scene, 1)];
 }
 
-export default function Gate3D({ event, arrival, reject, onPlateRead }) {
+// Ikki qorovul: budkadagi — keksaroq, yashil forma, oq mo'ylov; tashqaridagi — yosh, ko'k forma, jilet
+const GUARD_SEATED = { uniform: 0x2f4a3a, cap: 0x23362b, skin: 0xd9a77e, mustache: 0xd8d8d8, vest: false, girth: 1.15, brows: 0xbfbfbf };
+const GUARD_OUTSIDE = { uniform: 0x24448f, cap: 0x1b2a55, skin: 0xe8b98f, mustache: null, vest: true, girth: 1, brows: 0x3a2a20 };
+
+export default function Gate3D({ event, arrival, reject, release, onPlateRead }) {
   const mount = useRef(null);
   const bubble = useRef(null);
   const camBox = useRef(null);
@@ -469,23 +605,27 @@ export default function Gate3D({ event, arrival, reject, onPlateRead }) {
 
     const scene = new THREE.Scene();
     scene.background = new THREE.Color(0x24272c);
-    scene.fog = new THREE.Fog(0x24272c, 16, 30);
-    const camera = new THREE.PerspectiveCamera(36, 1, 0.1, 100);
+    scene.fog = new THREE.Fog(0x24272c, 20, 38);
+    const camera = new THREE.PerspectiveCamera(38, 1, 0.1, 100);
     const plateCam = new THREE.PerspectiveCamera(7, 16 / 10, 0.1, 40); // tor burchakli raqam kamerasi
 
     scene.add(new THREE.HemisphereLight(0xdfe6ff, 0x30343a, 1.3));
     const sun = new THREE.DirectionalLight(0xfff4e0, 2.2);
-    sun.position.set(5, 9, 6);
+    sun.position.set(6, 11, 7);
     sun.castShadow = true;
     sun.shadow.mapSize.set(2048, 2048);
-    Object.assign(sun.shadow.camera, { left: -12, right: 12, top: 10, bottom: -10 });
+    Object.assign(sun.shadow.camera, { left: -14, right: 14, top: 12, bottom: -12 });
     sun.shadow.bias = -0.0004;
     scene.add(sun);
 
-    const pivot = buildWorld(scene);
-    const guard = buildGuard();
+    const barriers = buildWorld(scene);
+    const seated = buildGuard(GUARD_SEATED);
+    seated.position.copy(SEAT).setY(0.15);
+    seated.rotation.y = Math.PI; // stolga (kirish tomon oynaga) qaragan
+    scene.add(seated);
+    const guard = buildGuard(GUARD_OUTSIDE);
     guard.position.copy(HOME);
-    guard.rotation.y = -Math.PI / 2;
+    guard.rotation.y = -Math.PI / 2; // chiqish yo'lagiga qaragan
     scene.add(guard);
     const cars = { in: buildCar(), out: buildCar() };
     for (const c of Object.values(cars)) {
@@ -529,7 +669,7 @@ export default function Gate3D({ event, arrival, reject, onPlateRead }) {
         car.rotation.y = st.car.rot;
         driveCar(car, st.car.x, st.car.z, dt);
         // Mashina to'xtagach kamera raqamni "aniqlaydi"
-        if (st.hold && cur.t > 3 && !cur.read) {
+        if (st.hold && cur.t > 3.2 && !cur.read) {
           cur.read = true;
           onRead.current?.(cur.ev.plate);
         }
@@ -539,42 +679,55 @@ export default function Gate3D({ event, arrival, reject, onPlateRead }) {
         }
         states[lane] = { ...st, lane, plate: cur.ev.plate };
       }
-      // Shlagbaum bitta: qaysi yo'lak so'rasa, ochiladi
-      pivot.rotation.x = -Math.max(states.in?.lift ?? 0, states.out?.lift ?? 0) * (Math.PI / 2.05);
 
-      // Qorovul bitta: band yo'lakka (avval chiqish — haydash muhimroq) e'tibor beradi
-      const busy = (st) => st && st.guard.mode !== 'idle';
-      const focus = busy(states.out) ? states.out : busy(states.in) ? states.in : states.in ?? states.out;
-      const gstate = focus?.guard ?? { pos: HOME, mode: 'idle' };
-      const focusCar = focus && cars[focus.lane].visible ? cars[focus.lane] : null;
-      const target = gstate.pos;
+      // Har yo'lakning o'z shlagbaumi; harakatlanganda chiroq miltillaydi
+      for (const b of barriers) {
+        const lift = (b.side < 0 ? states.in : states.out)?.lift ?? 0;
+        b.pivot.rotation.x = -b.side * lift * (Math.PI / 2.05);
+        const moving = lift > 0.01 && lift < 0.99;
+        b.beacon.material.emissiveIntensity = moving ? (Math.sin(time * 14) > 0 ? 3 : 0.3) : 0.2;
+      }
+
+      // Budkadagi qorovul: kirish yo'lagiga qaraydi, salomlashadi
+      const focusIn = states.in && cars.in.visible ? cars.in : states.out && cars.out.visible ? cars.out : null;
+      if (focusIn) look.set(focusIn.position.x, 1, focusIn.position.z);
+      const seatMode = states.in?.seat === 'sitwave' || states.out?.seat === 'sitwave' ? 'sitwave' : 'sit';
+      poseGuard(seated, seatMode, time, dt, focusIn ? look.clone() : null);
+
+      // Tashqaridagi qorovul: chiqish yo'lagi (xayrlashish, haydash)
+      const gs = states.out?.guard ?? { pos: HOME, mode: 'idle' };
+      const outCar = states.out && cars.out.visible ? cars.out : null;
+      const target = gs.pos;
       const moving = guard.position.distanceTo(target) > 0.005;
       const facing = moving
         ? Math.atan2(-(target.z - guard.position.z), target.x - guard.position.x)
-        : focusCar ? Math.atan2(-(focusCar.position.z - guard.position.z), focusCar.position.x - guard.position.x) : -Math.PI / 2;
+        : outCar ? Math.atan2(-(outCar.position.z - guard.position.z), outCar.position.x - guard.position.x) : -Math.PI / 2;
       guard.rotation.y = lerpAngle(guard.rotation.y, facing, Math.min(1, dt * 5));
       guard.position.copy(target);
-      if (focusCar) look.set(focusCar.position.x, 1, focusCar.position.z);
-      poseGuard(guard, gstate.mode, time, dt, focusCar ? look : null);
-      const state = { say: focus?.say, angry: focus?.angry };
+      if (outCar) look.set(outCar.position.x, 1, outCar.position.z);
+      poseGuard(guard, gs.mode, time, dt, outCar ? look : null);
+
+      // Gapiruvchi: chiqish voqeasi bo'lsa — tashqaridagi qorovul, aks holda budkadagi
+      const talk = states.out?.say ? states.out : states.in?.say ? states.in : null;
+      const speaker = talk?.speaker === 'guard' ? guard : seated;
 
       // Asosiy kamera sekin chayqaladi — sahna jonli ko'rinadi
-      camera.position.set(5.6 + Math.sin(time * 0.2) * 0.25, 4.8, 8.6);
-      camera.lookAt(0.4, 0.5, 0);
+      camera.position.set(4.6 + Math.sin(time * 0.2) * 0.25, 4.6, 8.4);
+      camera.lookAt(1.0, 0.7, 0);
       const w = el.clientWidth;
       const h = el.clientHeight;
       renderer.setViewport(0, 0, w, h);
       renderer.setScissorTest(false);
       renderer.render(scene, camera);
 
-      // Raqam kamerasi: ustundagi kamera mashina old raqamini kuzatadi (yuqori o'ng burchak)
+      // Raqam kamerasi: mashina old raqamini kuzatadi (yuqori o'ng burchak)
       const cb = camBox.current;
       const camState = states.in?.cam ? states.in : states.out?.cam ? states.out : null;
       if (camState && cars[camState.lane].visible) {
         const car = cars[camState.lane];
         const dir = camState.cam === 'in' ? 1 : -1;
-        plateCam.position.set(-dir * CAM_X, 1.36, CAM_Z + 0.08);
-        look.set(car.position.x + dir * 1.2, 0.36, car.position.z);
+        plateCam.position.copy(dir > 0 ? CAM_IN : CAM_OUT).setY((dir > 0 ? CAM_IN : CAM_OUT).y + 0.2);
+        look.set(car.position.x + dir * 1.2, 0.33, car.position.z);
         plateCam.lookAt(look);
         const iw = Math.round(w * 0.46);
         const ih = Math.round(iw * 0.62);
@@ -598,16 +751,16 @@ export default function Gate3D({ event, arrival, reject, onPlateRead }) {
         cb.className = 'cam-box';
       }
 
-      // Gap pufagi qorovul boshi ustida
+      // Gap pufagi gapirayotgan qorovul boshi ustida
       const b = bubble.current;
       if (b) {
-        if (state.say) {
-          guard.userData.head.getWorldPosition(headPos);
+        if (talk) {
+          speaker.userData.head.getWorldPosition(headPos);
           headPos.y += 0.45;
           headPos.project(camera);
           b.style.transform = `translate(${(headPos.x * 0.5 + 0.5) * w}px, ${(-headPos.y * 0.5 + 0.5) * h}px) translate(-50%, -100%)`;
-          if (b.textContent !== state.say) b.textContent = state.say;
-          b.className = `say on${state.angry ? ' angry' : ''}`;
+          if (b.textContent !== talk.say) b.textContent = talk.say;
+          b.className = `say on${talk.angry ? ' angry' : ''}`;
         } else if (b.className !== 'say') {
           b.className = 'say';
         }
@@ -627,25 +780,25 @@ export default function Gate3D({ event, arrival, reject, onPlateRead }) {
     if (arrival) queue.current.in.push({ type: 'arrive', plate: arrival.plate });
   }, [arrival]);
 
+  // Chek berildi — kutayotgan mashina shlagbaum oldidan kiradi
+  useEffect(() => {
+    const cur = current.current.in;
+    if (release && cur?.ev.type === 'arrive' && cur.ev.plate === release.plate) current.current.in = { ...cur, fn: enterScene, t: 2.4 };
+  }, [release]);
+
   // Kiritib bo'lmadi — kutayotgan mashina orqaga qaytadi
   useEffect(() => {
     const cur = current.current.in;
     if (reject && cur?.ev.type === 'arrive' && cur.ev.plate === reject.plate) current.current.in = { ...cur, fn: rejectScene, t: 0 };
   }, [reject]);
 
-  // Voqea: kutayotgan mashina kiritilsa — shlagbaum oldidan davom etadi, aks holda o'z yo'lagi navbatiga
+  // Server voqeasi: kamera oldida kutayotgan mashina bo'lsa — chek berilishini kutadi, aks holda o'z yo'lagi navbatiga
   useEffect(() => {
     if (!event || !SCENES[event.type]) return;
     const lane = event.type === 'enter' ? 'in' : 'out';
-    const cur = current.current.in;
-    if (lane === 'in' && cur?.ev.type === 'arrive' && cur.ev.plate === event.plate) {
-      current.current.in = { ...cur, fn: enterScene, t: 2.2 };
-      return;
-    }
-    const q = queue.current[lane];
-    const waiting = q.findIndex((x) => x.type === 'arrive' && x.plate === event.plate);
-    if (waiting >= 0) q.splice(waiting, 1);
-    q.push(event);
+    const waitingNow = current.current.in?.ev.type === 'arrive' && current.current.in.ev.plate === event.plate;
+    if (lane === 'in' && (waitingNow || queue.current.in.some((x) => x.type === 'arrive' && x.plate === event.plate))) return;
+    queue.current[lane].push(event);
   }, [event]);
 
   const caption = event && {

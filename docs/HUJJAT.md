@@ -94,7 +94,8 @@ Harakat (faqat amalga javoban):
 ## 7. Qorovul uchun qulayliklar
 
 - **Ketma-ket to'ldirish:** B blok to'lmaguncha C ga o'tilmaydi. Premium joy avtomatik berilmaydi — faqat mijoz xohlasa («Premium, yopiq» tugmasi).
-- **Raqam kamerasi — avtomatik kiritish:** mashina shlagbaum oldida to'xtaydi, tor burchakli kamera raqamni yaqindan ko'rsatadi (aniqlik foizi bilan), raqam o'qiladi va mashina **o'zi** keyingi bo'sh oddiy joyga kiritiladi. Qorovul katta yozilgan raqamni ko'radi va **chek chop etish yoki etmaslikni** o'zi hal qiladi. Joy bo'lmasa yoki mashina allaqachon ichkarida bo'lsa — «Mashinani qaytarish».
+- **Raqam kamerasi:** mashina shlagbaum oldida to'xtaydi, kamera raqamni o'qiydi va keyingi bo'sh joyni tayyorlaydi (mijoz xohlasa — premium). Mashina **chek berilmaguncha kirmaydi**: qorovul «Chek chop etish» → «Chek berildi, kirgizish» (yoki «Cheksiz kirgizish») bosgandagina shlagbaum ochiladi va rejada mashina joyiga kiradi. Joy bo'lmasa — «Mashinani qaytarish».
+- **3D darvoza:** alohida kirish va chiqish yo'laklari, o'rtada orolcha; har yo'lakning o'z shlagbaumi (qarshi yuk, uchida tayanch, miltillovchi chiroq). Katta oynali «QO'RIQLASH POSTI» budkasi: ichida stol, monitor va stulda o'tirgan keksa qorovul (yashil forma, oq mo'ylov) — kirganlar bilan salomlashadi. Tashqarida yosh qorovul (ko'k forma, jilet) — chiqqanlarni kuzatadi va to'lamaganni haydaydi.
 - Skaner, kirish cheki va chiqish cheki oynalari **chap tomonda** chiqadi — o'ngdagi kamera va raqam yopilmaydi. Chek qog'ozi qotmasdan, ravon chiqadi.
 - **Moykachilar jamoasi** (3 kishi, har biri boshqa forma va asbobda): har biri boshqa mashinani yuvadi, qimmat mashinani ko'rsa «Vuy j....b, Rolls-Royce-mi?!» deb hayron qoladi.
 - Mashina markasi raqamdan aniqlanadi (sinov uchun), rejada sedan, SUV va sport mashinalar har xil ko'rinadi.

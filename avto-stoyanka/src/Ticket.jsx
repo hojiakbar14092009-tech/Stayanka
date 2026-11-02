@@ -12,17 +12,18 @@ export function QR({ code, size = 168 }) {
   return <div className="qr" style={{ width: size, height: size }} dangerouslySetInnerHTML={{ __html: svg }} />;
 }
 
-export default function Ticket({ ticket: t, onClose }) {
+export default function Ticket({ ticket: t, onClose, closeLabel = 'Yopish' }) {
   useEffect(() => {
-    const onKey = (e) => e.key === 'Escape' && onClose();
+    const onKey = (e) => e.key === 'Escape' && !t.handover && onClose();
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [onClose]);
+  }, [onClose, t.handover]);
 
+  // Darvozadagi mashina cheki tasodifan yopilmasin: faqat tugma bilan (chek berildi)
   const hour = t.tariff && (t.is_premium ? t.tariff.premium_hour : t.tariff.base_hour);
 
   return (
-    <div className="overlay" onClick={onClose} role="dialog" aria-modal="true" aria-label="Kirish cheki">
+    <div className="overlay" onClick={t.handover ? undefined : onClose} role="dialog" aria-modal="true" aria-label="Kirish cheki">
       <div className="printer" onClick={(e) => e.stopPropagation()}>
         <div className="printer-slot" />
         <div className="paper-clip">
@@ -52,7 +53,7 @@ export default function Ticket({ ticket: t, onClose }) {
         </div>
         <div className="printer-actions">
           <button className="btn" onClick={() => window.print()}>Chop etish</button>
-          <button className="btn ghost" onClick={onClose} autoFocus>Yopish</button>
+          <button className={t.handover ? 'btn primary' : 'btn ghost'} onClick={onClose} autoFocus>{closeLabel}</button>
         </div>
       </div>
     </div>

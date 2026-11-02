@@ -210,7 +210,7 @@ label { display: grid; gap: .3rem; font-size: .9rem; color: var(--paint-dim); }
 .facts .price { color: var(--yellow); font-size: 1.8rem; }
 
 /* 3D darvoza */
-.gate { position: relative; height: 210px; border-radius: 10px; overflow: hidden; background: var(--asphalt); }
+.gate { position: relative; height: 270px; border-radius: 10px; overflow: hidden; background: var(--asphalt); }
 .gate-canvas { position: absolute; inset: 0; }
 .gate-caption {
   position: absolute; left: 10px; bottom: 10px; display: flex; align-items: center; gap: .5rem;

@@ -301,6 +301,9 @@ export default function GuardPanel({ spots, tariff, reload, lastEvent, notify })
   const [arrival, setArrival] = useState(null); // kamera oldiga kelgan mashina
   const [arrived, setArrived] = useState(null); // kamera o'qigan va avtomatik kiritilgan mashina
   const [reject, setReject] = useState(null); // kiritib bo'lmadi — mashina orqaga qaytariladi
+  const [release, setRelease] = useState(null); // chek berildi — shlagbaum ochiladi
+  const [hidden, setHidden] = useState(() => new Set()); // bazada band, lekin mashina hali darvozada — rejada ko'rsatilmaydi
+  const [arrivePremium, setArrivePremium] = useState(false);
   const plateInput = useRef(null);
   const now = useNow();
 
@@ -311,19 +314,49 @@ export default function GuardPanel({ spots, tariff, reload, lastEvent, notify })
     [spots, premium]
   );
 
-  // Kamera raqamni o'qidi → avtomatik keyingi bo'sh oddiy joyga kiritiladi. Chek berish — qorovul qarori.
-  async function plateRead(p) {
+  // Kamera raqamni o'qidi → mashina shlagbaum oldida kutadi, joy avtomatik tanlanadi.
+  // Qorovul chekni chop etib bergandan keyingina mashina kiradi (yoki cheksiz kirgizadi).
+  const plateRead = (p) => {
+    setArrivePremium(false);
+    setArrived({ plate: p, status: 'read' });
+  };
+
+  // Mashinani ichkariga qo'yish: shlagbaum ochiladi, rejada mashina darvozadan o'tgach paydo bo'ladi
+  const letIn = (spotId, p) => {
+    setRelease({ plate: p, at: Date.now() });
+    setArrived(null);
+    setTimeout(() => setHidden((h) => {
+      const n = new Set(h);
+      n.delete(spotId);
+      return n;
+    }), 2600);
+  };
+
+  async function admit(print) {
+    const p = arrived.plate;
     setArrived({ plate: p, status: 'saving' });
     try {
-      const { spot, ticket: t } = await api('/enter', { method: 'POST', body: { plate: p } });
-      setArrived({ plate: p, status: 'in', spot, ticket: t });
+      const { spot, ticket: t } = await api('/enter', { method: 'POST', body: { plate: p, premium: arrivePremium } });
+      setHidden((h) => new Set(h).add(spot.id));
       setSelectedId(null);
       setZone(spot.zone);
       await reload();
+      if (print) {
+        setArrived({ plate: p, status: 'printing', spot, ticket: t });
+        setTicket({ ...t, handover: true });
+      } else {
+        letIn(spot.id, p);
+      }
     } catch (err) {
       setArrived({ plate: p, status: 'error', error: err.message });
     }
   }
+
+  // Chek oynasi yopildi: agar bu darvozadagi mashinaning cheki bo'lsa — haydovchiga berildi, mashina kiradi
+  const closeTicket = () => {
+    if (ticket?.handover) letIn(ticket.spot_id, ticket.plate);
+    setTicket(null);
+  };
 
   // Qidiruv: hamma 200 joy bo'ylab — raqam yoki chek raqami bo'yicha
   const term = norm(search);
@@ -391,7 +424,9 @@ export default function GuardPanel({ spots, tariff, reload, lastEvent, notify })
     await reload().catch((e) => notify?.(e.message));
   };
 
-  const zoneSpots = spots.filter((s) => s.zone === zone);
+  const view = hidden.size ? spots.map((s) => (hidden.has(s.id) ? { ...s, is_busy: false, plate: null, session_id: null } : s)) : spots;
+  const zoneSpots = view.filter((s) => s.zone === zone);
+  const readyFree = view.find((s) => !s.is_busy && !s.is_disabled && s.is_premium === arrivePremium);
   const stayMs = selected?.entered_at ? now - new Date(selected.entered_at) : 0;
   const firstHour = (prem) => tariff && money(prem ? tariff.premium_hour : tariff.base_hour);
 
@@ -400,7 +435,7 @@ export default function GuardPanel({ spots, tariff, reload, lastEvent, notify })
       <section className="yard">
         <nav className="zones" aria-label="Zonalar">
           {ZONES.map((z) => {
-            const list = spots.filter((s) => s.zone === z);
+            const list = view.filter((s) => s.zone === z);
             const free = list.filter((s) => !s.is_busy && !s.is_disabled).length;
             const hits = list.filter((s) => foundIds.has(s.id)).length;
             return (
@@ -452,7 +487,7 @@ export default function GuardPanel({ spots, tariff, reload, lastEvent, notify })
         </form>
 
         <Suspense fallback={<div className="gate" />}>
-          <Gate3D event={lastEvent} arrival={arrival} reject={reject} onPlateRead={plateRead} />
+          <Gate3D event={lastEvent} arrival={arrival} reject={reject} release={release} onPlateRead={plateRead} />
         </Suspense>
         <button className="btn ghost sm cam-demo" onClick={() => setArrival({ plate: randomPlate(), at: Date.now() })}>
           <Icon name="camera" /> Kamera oldiga mashina keldi (sinov)
@@ -462,22 +497,33 @@ export default function GuardPanel({ spots, tariff, reload, lastEvent, notify })
           <div className={`card arrived ${arrived.status}`} role="status">
             <p className="arrived-head"><Icon name="camera" /> Kamera o'qigan raqam</p>
             <p className="plate xl">{arrived.plate}</p>
-            {arrived.status === 'saving' && <p className="muted">Bo'sh joy tanlanmoqda…</p>}
-            {arrived.status === 'in' && (
+            {arrived.status === 'read' && (
               <>
                 <p className="arrived-spot">
-                  <Icon name="check" /> Avtomatik kiritildi: <b>{arrived.spot.label}</b>
-                  <span className="muted"> {brandFor(arrived.plate, arrived.spot.is_premium)}</span>
+                  <Icon name="pin" /> Joy tayyor: <b>{readyFree?.label ?? "bo'sh joy yo'q"}</b>
+                  <span className="muted"> {brandFor(arrived.plate, arrivePremium)}</span>
                 </p>
-                {arrived.ticket.debt > 0 && <p className="error"><Icon name="warning" /> Oldingi qarzi: {money(arrived.ticket.debt)}</p>}
-                <p className="muted small">Haydovchiga chek berilsinmi?</p>
+                <div className="seg wide" role="group" aria-label="Joy turi — mijoz tanlaydi">
+                  <button type="button" className={arrivePremium ? '' : 'on'} onClick={() => setArrivePremium(false)}>Oddiy joy</button>
+                  <button type="button" className={arrivePremium ? 'on gold-on' : ''} onClick={() => setArrivePremium(true)}><Icon name="crown" /> Premium</button>
+                </div>
+                <p className="muted small">Mashina shlagbaum oldida kutmoqda. Chek berilgach kiradi.</p>
                 <div className="arrived-actions">
-                  <button className="btn primary" onClick={() => { setTicket(arrived.ticket); setArrived(null); }} autoFocus>
+                  <button className="btn primary" onClick={() => admit(true)} disabled={!readyFree}>
                     <Icon name="print" /> Chek chop etish
                   </button>
-                  <button className="btn ghost" onClick={() => setArrived(null)}>Chek kerak emas</button>
+                  <button className="btn ghost" onClick={() => admit(false)} disabled={!readyFree}>Cheksiz kirgizish</button>
                 </div>
+                {!readyFree && (
+                  <button className="btn danger" onClick={() => { setReject({ plate: arrived.plate, at: Date.now() }); setArrived(null); }}>
+                    <Icon name="exit" /> Mashinani qaytarish
+                  </button>
+                )}
               </>
+            )}
+            {arrived.status === 'saving' && <p className="muted">Joy band qilinmoqda…</p>}
+            {arrived.status === 'printing' && (
+              <p className="arrived-spot"><Icon name="print" /> Chek chop etilmoqda: <b>{arrived.spot.label}</b>. Chekni haydovchiga bering.</p>
             )}
             {arrived.status === 'error' && (
               <>
@@ -486,7 +532,7 @@ export default function GuardPanel({ spots, tariff, reload, lastEvent, notify })
                   <button className="btn danger" onClick={() => { setReject({ plate: arrived.plate, at: Date.now() }); setArrived(null); }}>
                     <Icon name="exit" /> Mashinani qaytarish
                   </button>
-                  <button className="btn ghost" onClick={() => plateRead(arrived.plate)}>Qayta urinish</button>
+                  <button className="btn ghost" onClick={() => setArrived({ plate: arrived.plate, status: 'read' })}>Qayta urinish</button>
                 </div>
               </>
             )}
@@ -551,7 +597,7 @@ export default function GuardPanel({ spots, tariff, reload, lastEvent, notify })
         </div>
       </aside>
 
-      {ticket && <Ticket ticket={ticket} onClose={() => setTicket(null)} />}
+      {ticket && <Ticket ticket={ticket} onClose={closeTicket} closeLabel={ticket.handover ? 'Chek berildi, kirgizish' : 'Yopish'} />}
       {scanning && <ScanModal code={scanning} onClose={() => setScanning(null)} onExit={afterExit} />}
       {receipt && <Receipt receipt={receipt} onClose={() => setReceipt(null)} />}
     </div>
