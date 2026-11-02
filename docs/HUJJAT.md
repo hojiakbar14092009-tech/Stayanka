@@ -221,3 +221,13 @@ Sinov uchun 30 kunlik tarix: `npm run demo` (server papkasida).
   aylanma eshik aylanadi, quyosh soyasi butun maydonni qoplaydi.
 - **Kamera:** savdo markazi, maydon va darvoza bir kadrda; harakatdagi mashinani yumshoq kuzatadi.
   «Kattalashtirish» tugmasi 3D ni butun ekranga ochadi (Esc — yopish).
+
+## 15. 3 qavatli garaj — 200 joy (3D)
+
+- Ochiq maydon o'rniga 3 qavatli garaj: 1-qavat — A (premium) va B, 2-qavat — C va D, 3-qavat (ochiq tom) — E. Har zona 2D rejadagidek 10 × 4 joy, raqamlar polga chizilgan (`A-01` …).
+- 3D garaj serverdagi bandlik bilan bir xil: band joyda mashina turadi, bo'shda yo'q. Har joy ustida chiroq: yashil — bo'sh, qizil — band, ko'k — nogironlar uchun. Kirishdagi LED tablo har qavatdagi bo'sh joylarni ko'rsatadi.
+- Mashinalar paydo bo'lmaydi: shlagbaumdan garajga kirib, kerak bo'lsa spiral rampa bo'ylab o'z qavatiga ko'tariladi va aynan o'z joyiga kiradi; chiqishda joyidan orqaga chiqib, rampadan tushib shlagbaumga keladi. Shlagbaum yopilgach darvoza keyingi mashinani qabul qiladi.
+- "Kesim": mashina pastki qavatda yursa, ustidagi qavatlar shaffof bo'lib ichkari ko'rinadi.
+- Zona tugmasi bosilsa, kamera o'sha zonaga boradi, qavat ochiladi va zona oltin ramka hamda "Zona C · 2-qavat" yozuvi bilan belgilanadi (7 soniya).
+- Premium A: yaltiroq qora pol, joylar orasida shisha devorchalar, oltin ship yoritgichi, "PREMIUM" peshtoqi, oltin ustunlar va mashinani yuvayotgan moykachilar.
+- Savdo markazi 1,7 barobar kattalashtirildi, garaj ortida; garaj tomidan unga shisha piyodalar ko'prigi o'tadi.

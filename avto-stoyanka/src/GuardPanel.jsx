@@ -347,8 +347,8 @@ export default function GuardPanel({ spots, tariff, reload, lastEvent, notify })
   };
 
   // Mashinani ichkariga qo'yish: shlagbaum ochiladi, rejada mashina darvozadan o'tgach paydo bo'ladi
-  const letIn = (spotId, p) => {
-    setRelease({ plate: p, at: Date.now() });
+  const letIn = (spotId, p, label) => {
+    setRelease({ plate: p, label, at: Date.now() });
     setArrived(null);
     setTimeout(() => setHidden((h) => {
       const n = new Set(h);
@@ -370,7 +370,7 @@ export default function GuardPanel({ spots, tariff, reload, lastEvent, notify })
         setArrived({ plate: p, status: 'printing', spot, ticket: t });
         setTicket({ ...t, handover: true });
       } else {
-        letIn(spot.id, p);
+        letIn(spot.id, p, spot.label);
       }
     } catch (err) {
       setArrived({ plate: p, status: 'error', error: err.message });
@@ -379,7 +379,7 @@ export default function GuardPanel({ spots, tariff, reload, lastEvent, notify })
 
   // Chek oynasi yopildi: agar bu darvozadagi mashinaning cheki bo'lsa — haydovchiga berildi, mashina kiradi
   const closeTicket = () => {
-    if (ticket?.handover) letIn(ticket.spot_id, ticket.plate);
+    if (ticket?.handover) letIn(ticket.spot_id, ticket.plate, spots.find((s) => s.id === ticket.spot_id)?.label);
     setTicket(null);
   };
 
@@ -513,7 +513,7 @@ export default function GuardPanel({ spots, tariff, reload, lastEvent, notify })
         </form>
 
         <Suspense fallback={<div className="gate" />}>
-          <Gate3D event={lastEvent} arrival={arrival} reject={reject} release={release} onPlateRead={plateRead} />
+          <Gate3D event={lastEvent} arrival={arrival} reject={reject} release={release} spots={view} focusZone={zone} onPlateRead={plateRead} />
         </Suspense>
         <button className="btn ghost sm cam-demo" onClick={() => setArrival({ plate: randomPlate(), at: Date.now() })}>
           <Icon name="camera" /> Kamera oldiga mashina keldi (sinov)

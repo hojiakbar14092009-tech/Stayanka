@@ -2,7 +2,7 @@
 // Qorovul doim "tirik": nafas oladi, atrofga qaraydi; mashinaga qo'l ko'taradi yoki to'lamaganni haydaydi.
 import { useEffect, useRef, useState } from 'react';
 import * as THREE from 'three';
-import { clamp01, smooth, seg, lerp, lerpAngle, mat, mesh, box, drawPlate, buildCar, buildGuard, poseGuard, driveCar } from './three-kit';
+import { clamp01, smooth, seg, lerp, lerpAngle, mat, mesh, box, drawPlate, buildCar, buildParkedCar, buildGuard, poseGuard, driveCar } from './three-kit';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import { paintFor, brandFor, shapeFor } from './api';
 
@@ -25,23 +25,57 @@ const SEAT = new THREE.Vector3(BOOTH.x - 0.55, 0, 0.1); // budkadagi qorovul stu
 const HOME = new THREE.Vector3(BOOTH.x + BOOTH.w / 2 + 0.7, 0, 0.45); // tashqaridagi qorovul joyi
 const SHOUT_SPOT = new THREE.Vector3(3.7, 0, ISLAND + 0.25);
 
-// ---------- To'xtash maydoni (shlagbaumdan keyin, savdo markazi oldida) ----------
-// Ikki qator × 10 joy, o'rtada yo'lak. A qator — yo'lga qaragan, B qator — savdo markaziga qaragan.
-const LOT = { aisleZ: -12, rowA: -9.4, rowB: -14.6, x0: 13.2, pitch: 1.75, n: 10 };
-const STALLS = [];
-for (const row of ['A', 'B']) {
-  for (let i = 0; i < LOT.n; i++) {
-    STALLS.push({ row, x: LOT.x0 + i * LOT.pitch, z: row === 'A' ? LOT.rowA : LOT.rowB, rot: row === 'A' ? -Math.PI / 2 : Math.PI / 2 });
-  }
+// ---------- Ko'p qavatli garaj: 200 joy, 2D reja bilan bir xil joylashuv ----------
+// 1-qavat: A (premium) + B; 2-qavat: C + D; 3-qavat (ochiq tom): E. Qavatlar spiral rampa bilan bog'langan.
+// Har zona — 10 ustun × 4 qator: 1-qator, yo'lak, 2-qator, ustunlar, 3-qator, yo'lak, 4-qator.
+const FLOOR_H = 3.2;
+const G = { x0: 10, x1: 48.6, zF: -8, zB: -25.8, xL: 10.9, xR: 47.7, lane1: -12.3, lane2: -21.5 };
+const ROWS_Z = [-9.3, -15.3, -18.5, -24.5];
+const PITCH = 1.75;
+const ZONE_POS = { A: [0, 11.8], B: [0, 29.3], C: [1, 11.8], D: [1, 29.3], E: [2, 11.8] }; // [qavat, blok x0]
+const HELIX = { x: 52.6, z: -16.9, r: 3.9 };
+
+// "B-07" → 3D joy: qavat, koordinata, qaysi yo'lakdan kiriladi, mashina qaysi tomonga qaraydi
+function stallFor(label) {
+  const [zone, num] = String(label || '').split('-');
+  const pos = ZONE_POS[zone];
+  const n = Number(num) - 1;
+  if (!pos || !(n >= 0 && n < 40)) return null;
+  const row = Math.floor(n / 10);
+  const z = ROWS_Z[row];
+  const laneZ = row < 2 ? G.lane1 : G.lane2;
+  const toward = Math.sign(z - laneZ); // yo'lakdan joyga qaysi tomonga
+  return {
+    label, zone, level: pos[0], y: pos[0] * FLOOR_H, x: pos[1] + PITCH / 2 + (n % 10) * PITCH, z, laneZ, toward,
+    rot: toward > 0 ? -Math.PI / 2 : Math.PI / 2, // oldi bilan kiradi
+  };
 }
 
-// Egri yo'l bo'ylab harakat: har bo'lak — silliq (Catmull-Rom) chiziq, boshida tezlashadi, oxirida to'xtaydi.
-// reverse: mashina orqaga yuradi (oldi harakatga teskari)
+// Keskin orqaga qaytadigan va juda yaqin nuqtalarni olib tashlaymiz — yo'l tugun hosil qilmasin
+function clean(pts) {
+  const out = [pts[0]];
+  for (let i = 1; i < pts.length; i++) {
+    const a = out.at(-1);
+    const b = pts[i];
+    if (Math.hypot(b[0] - a[0], b[1] - a[1]) < 0.35 && i < pts.length - 1) continue;
+    const c = pts[i + 1];
+    if (c && out.length > 1) {
+      const p = out.at(-2);
+      const v1 = [a[0] - p[0], a[1] - p[1]];
+      const v2 = [b[0] - a[0], b[1] - a[1]];
+      if ((v1[0] * v2[0] + v1[1] * v2[1]) / (Math.hypot(...v1) * Math.hypot(...v2) || 1) < -0.5) continue;
+    }
+    out.push(b);
+  }
+  return out;
+}
+
+// Silliq yo'l (3D: [x, z, y]); boshida tezlashadi, oxirida to'xtaydi; uzun yo'lda tezroq. reverse: orqaga yuradi
 function makeMotion(segments) {
   const segs = segments.map(({ pts, reverse = false, speed = 3.2 }) => {
-    const curve = new THREE.CatmullRomCurve3(pts.map(([x, z]) => new THREE.Vector3(x, 0, z)), false, 'centripetal');
+    const curve = new THREE.CatmullRomCurve3(clean(pts).map(([x, z, y = 0]) => new THREE.Vector3(x, y, z)), false, 'centripetal');
     const len = curve.getLength();
-    return { curve, reverse, dur: len / speed + 0.9 };
+    return { curve, reverse, dur: len / (speed * (reverse ? 1 : 1 + len / 120)) + 0.9 };
   });
   const total = segs.reduce((a, s) => a + s.dur, 0);
   const tan = new THREE.Vector3();
@@ -56,7 +90,8 @@ function makeMotion(segments) {
           s.curve.getPointAt(p, pos);
           s.curve.getTangentAt(Math.min(0.999, Math.max(0.001, p)), tan);
           const rot = Math.atan2(-tan.z, tan.x) + (s.reverse ? Math.PI : 0);
-          return { x: pos.x, z: pos.z, rot };
+          const pitch = Math.atan2(tan.y, Math.hypot(tan.x, tan.z) || 1) * (s.reverse ? -1 : 1);
+          return { x: pos.x, y: pos.y, z: pos.z, rot, pitch };
         }
         tt -= s.dur;
       }
@@ -65,24 +100,70 @@ function makeMotion(segments) {
   };
 }
 
-// Shlagbaumdan → maydon yo'lagi → bo'sh joyga (oldi bilan) kirish
+// Spiral rampa: g'arbiy nuqtadan boshlab, har aylanishda bir qavat ko'tariladi
+function helixPts(level) {
+  const pts = [];
+  const steps = level * 24;
+  for (let i = 0; i <= steps; i++) {
+    const f = i / steps;
+    const a = Math.PI + f * level * Math.PI * 2;
+    pts.push([HELIX.x + HELIX.r * Math.cos(a), HELIX.z + HELIX.r * Math.sin(a), f * level * FLOOR_H]);
+  }
+  return pts;
+}
+
+// Yo'lak bo'ylab joyga yaqinlashib, oldi bilan kirish (from: 1 — g'arbdan, -1 — sharqdan)
+function intoStall(st, from) {
+  const y = st.y;
+  return [[st.x - from * 2.4, st.laneZ, y], [st.x - from * 0.8, st.laneZ + st.toward * 0.9, y], [st.x, st.z - st.toward * 1.0, y], [st.x, st.z, y]];
+}
+// Joydan orqaga chiqib, yo'lakda yurishga tayyor turish (dir: 1 — sharqqa, -1 — g'arbga)
+function outOfStall(st, dir) {
+  const y = st.y;
+  return [[st.x, st.z, y], [st.x, st.z - st.toward * 1.2, y], [st.x - dir * 0.6, st.laneZ + st.toward * 0.5, y], [st.x - dir * 1.8, st.laneZ, y]];
+}
+
+const DRIVEWAY_IN = [[STOP_IN, LANE_IN], [2.5, LANE_IN], [6.4, -3.3], [8.8, -5.0], [10.2, -7.4], [G.xL, -9.6]];
+const DRIVEWAY_OUT = [[G.xL, -9.6], [10.2, -7.4], [9.4, -5.4], [9.5, -2.4], [9.8, 0.2], [9.2, 2.5], [7.4, LANE_OUT], [STOP_OUT, LANE_OUT]];
+const RAMP_UP = [[G.xR - 1.0, G.lane1], [G.xR, G.lane1 - 1.0], [HELIX.x - HELIX.r + 0.2, HELIX.z + 1.6]];
+
+// Shlagbaumdan → garaj → (kerak bo'lsa spiral rampa bo'ylab o'z qavatiga) → aynan o'z joyiga
 function enterMotion(st) {
-  const turnZ = st.row === 'A' ? -11.3 : -12.7;
-  const nearZ = st.row === 'A' ? -10.4 : -13.6;
-  const pts = [[STOP_IN, LANE_IN], [2.5, LANE_IN], [6.4, -3.3], [8.7, -4.8], [9.6, -8.6], [10.4, -11.5], [11.6, -12]];
-  if (st.x - 2.4 > 12.1) pts.push([st.x - 2.4, LOT.aisleZ]);
-  pts.push([st.x - 0.8, turnZ], [st.x, nearZ], [st.x, st.z]);
+  const pts = [...DRIVEWAY_IN];
+  const y = st.y;
+  if (st.level === 0) {
+    if (st.laneZ === G.lane1) pts.push([G.xL + 0.3, G.lane1 + 1.0], [G.xL + 1.4, G.lane1]);
+    else pts.push([G.xL, G.lane2 + 1.2], [G.xL + 1.4, G.lane2]);
+    pts.push(...intoStall(st, 1));
+  } else {
+    // 1-qavat yo'lagi bo'ylab sharqqa → rampa → yuqori qavat, sharqiy chetdan 2-yo'lakka
+    pts.push([G.xL + 0.3, G.lane1 + 1.0], [G.xL + 1.4, G.lane1], ...RAMP_UP, ...helixPts(st.level).slice(0, -1));
+    pts.push([HELIX.x - HELIX.r, HELIX.z, y], [G.xR + 0.2, G.lane2 + 1.4, y], [G.xR - 1.0, G.lane2, y]);
+    if (st.laneZ === G.lane2) pts.push(...intoStall(st, -1));
+    else pts.push([G.xL + 1.2, G.lane2, y], [G.xL, G.lane2 + 1.2, y], [G.xL, G.lane1 - 1.0, y], [G.xL + 1.4, G.lane1, y], ...intoStall(st, 1));
+  }
   return makeMotion([{ pts, speed: 3.6 }]);
 }
 
-// Joydan orqaga chiqish → maydon yo'lagi → orolcha uchini aylanib → chiqish shlagbaumi oldida to'xtash
+// O'z joyidan orqaga chiqish → (yuqori qavatda spiral rampa bo'ylab tushish) → garaj chiqishi → chiqish shlagbaumi
 function exitMotion(st) {
-  const backZ = st.row === 'A' ? -10.6 : -13.4;
-  const swingZ = st.row === 'A' ? -11.6 : -12.4;
-  return makeMotion([
-    { pts: [[st.x, st.z], [st.x, backZ], [st.x + 0.6, swingZ], [st.x + 1.6, LOT.aisleZ]], reverse: true, speed: 1.6 },
-    { pts: [[st.x + 1.6, LOT.aisleZ], [11.2, LOT.aisleZ], [10.0, -11.0], [9.4, -8.4], [9.2, -5.4], [9.5, -2.4], [9.8, 0.2], [9.2, 2.5], [7.4, LANE_OUT], [STOP_OUT, LANE_OUT]], speed: 3.6 },
-  ]);
+  const y = st.y;
+  if (st.level === 0) {
+    const back = outOfStall(st, -1); // g'arbga — chiqish yo'li tomonga
+    const pts = [back.at(-1)];
+    if (st.laneZ === G.lane1) pts.push([G.xL + 1.4, G.lane1], [G.xL, G.lane1 + 1.0]);
+    else pts.push([G.xL + 1.4, G.lane2], [G.xL, G.lane2 + 1.2], [G.xL, G.lane1]);
+    pts.push(...DRIVEWAY_OUT);
+    return makeMotion([{ pts: back, reverse: true, speed: 1.6 }, { pts, speed: 3.6 }]);
+  }
+  // yuqori qavat: 2-yo'lak bo'ylab sharqqa → rampa → pastga → 1-qavat 1-yo'lagi bo'ylab g'arbga → chiqish
+  const dir = st.laneZ === G.lane2 ? 1 : -1;
+  const back = outOfStall(st, dir);
+  const pts = [back.at(-1)];
+  if (st.laneZ === G.lane1) pts.push([G.xL + 1.4, G.lane1, y], [G.xL, G.lane1 - 1.0, y], [G.xL, G.lane2 + 1.2, y], [G.xL + 1.4, G.lane2, y]);
+  pts.push([G.xR - 1.0, G.lane2, y], [G.xR + 0.2, G.lane2 + 1.4, y], [HELIX.x - HELIX.r, HELIX.z - 0.1, y]);
+  pts.push(...helixPts(st.level).reverse().slice(1), ...[...RAMP_UP].reverse(), [G.xL + 1.4, G.lane1], [G.xL, G.lane1 + 1.0], ...DRIVEWAY_OUT);
+  return makeMotion([{ pts: back, reverse: true, speed: 1.6 }, { pts, speed: 3.6 }]);
 }
 
 // ---------- Ssenariylar: (t soniya, reja) → mashina, shlagbaum, qorovullar holati ----------
@@ -104,7 +185,7 @@ function enterScene(t, plan) {
   else car = plan.motion.at(t - GO);
   const end = GO + (plan.motion?.total ?? 0);
   return {
-    ...idleCrew, car, done: t > end + 0.3, parked: true, cam: t < 2.4 ? 'in' : null, moving: t > GO,
+    ...idleCrew, car, done: t > end + 0.3, parked: true, detach: !!plan.motion && t > GO + 5.5, cam: t < 2.4 ? 'in' : null, moving: t > GO,
     lift: smooth(seg(t, 2.4, 3.3)) - smooth(seg(t, GO + 3.0, GO + 4.0)),
     seat: t > 2.2 && t < 4.6 ? 'sitwave' : 'sit', say: t > 2.3 && t < 4.4 ? 'Xush kelibsiz!' : null, speaker: 'seat',
   };
@@ -425,26 +506,26 @@ function buildBooth(scene) {
 
 function buildWorld(scene) {
   // Asfalt, maysa, trotuarlar
-  const ground = mesh(new THREE.PlaneGeometry(90, 60), new THREE.MeshStandardMaterial({ map: grassTex([18, 12]), roughness: 1 }), { shadow: false });
+  const ground = mesh(new THREE.PlaneGeometry(220, 170), new THREE.MeshStandardMaterial({ map: grassTex([44, 34]), roughness: 1 }), { x: 15, z: -25, shadow: false });
   ground.rotation.x = -Math.PI / 2;
   scene.add(ground);
-  const road = mesh(new THREE.BoxGeometry(44, 0.02, ROAD_EDGE * 2), new THREE.MeshStandardMaterial({ map: asphaltTex([11, 2.4]), roughness: 0.92 }), { y: 0.01, shadow: false });
+  const road = mesh(new THREE.BoxGeometry(120, 0.02, ROAD_EDGE * 2), new THREE.MeshStandardMaterial({ map: asphaltTex([30, 2.4]), roughness: 0.92 }), { x: 15, y: 0.01, shadow: false });
   road.receiveShadow = true;
   scene.add(road);
   const white = mat(0xeceae4, { roughness: 0.8 });
   const yellow = mat(0xf2c230, { roughness: 0.7 });
   const curbMat = mat(0x8d8f93);
   const walk = (len) => new THREE.MeshStandardMaterial({ map: tileTex([len / 2, 1.1]), roughness: 0.85 });
-  scene.add(box(44, 0.16, 0.3, curbMat, { y: 0.08, z: ROAD_EDGE + 0.15 }));
-  scene.add(box(44, 0.12, 2.2, walk(44), { y: 0.06, z: ROAD_EDGE + 1.4 }));
+  scene.add(box(120, 0.16, 0.3, curbMat, { x: 15, y: 0.08, z: ROAD_EDGE + 0.15 }));
+  scene.add(box(120, 0.12, 2.2, walk(120), { x: 15, y: 0.06, z: ROAD_EDGE + 1.4 }));
   // -z tomonda trotuar maydon kirish yo'li (x 7,6..11) da uziladi
-  for (const [x0, x1] of [[-22, 7.6], [11, 22]]) {
+  for (const [x0, x1] of [[-45, 7.6], [11, 75]]) {
     scene.add(box(x1 - x0, 0.16, 0.3, curbMat, { x: (x0 + x1) / 2, y: 0.08, z: -ROAD_EDGE - 0.15 }));
     scene.add(box(x1 - x0, 0.12, 2.2, walk(x1 - x0), { x: (x0 + x1) / 2, y: 0.06, z: -ROAD_EDGE - 1.4 }));
   }
   // Yo'lak chiziqlari va stop chiziqlari
   for (const z of [-(ISLAND + 0.15), ISLAND + 0.15, -(ROAD_EDGE - 0.2), ROAD_EDGE - 0.2]) {
-    for (let x = -21; x < 21; x += 2) scene.add(box(1.1, 0.01, 0.1, white, { x, y: 0.022, z, shadow: false }));
+    for (let x = -44; x < 74; x += 2) scene.add(box(1.1, 0.01, 0.1, white, { x, y: 0.022, z, shadow: false }));
   }
   scene.add(box(0.3, 0.01, ROAD_EDGE - ISLAND, white, { x: -1.2, y: 0.023, z: -(ROAD_EDGE + ISLAND) / 2, shadow: false }));
   scene.add(box(0.3, 0.01, ROAD_EDGE - ISLAND, white, { x: 1.2, y: 0.023, z: (ROAD_EDGE + ISLAND) / 2, shadow: false }));
@@ -460,21 +541,21 @@ function buildWorld(scene) {
   // Daraxtlar qatori (trotuar ortida) va butalar
   let seed = 1;
   for (const z of [-ROAD_EDGE - 3.4, ROAD_EDGE + 3.4]) {
-    for (let x = -20; x <= 20; x += 4.2) {
+    for (let x = -20; x <= 62; x += 4.2) {
       if (z < 0 && (Math.abs(x - 0.5) < 2 || x > 5)) continue; // budka ro'parasi va to'xtash maydoni ochiq
       scene.add(buildTree(x + Math.sin(seed) * 0.6, z + Math.cos(seed) * 0.4, 0.95 + (seed % 3) * 0.12, seed++));
     }
-    for (let x = -19; x <= 19; x += 2.1) if (z > 0 || x < 6) scene.add(buildBush(x, z > 0 ? z - 1.2 : z + 1.2, 0.8 + (seed % 2) * 0.2, seed++));
+    for (let x = -19; x <= 61; x += 2.1) if (z > 0 || x < 6) scene.add(buildBush(x, z > 0 ? z - 1.2 : z + 1.2, 0.8 + (seed % 2) * 0.2, seed++));
   }
   for (const x of [-5.2, 6.2]) scene.add(buildBush(x, 0, 1, seed++)); // orolchadagi gulzor
   // Ko'cha chiroqlari ikki tomonda
   for (const x of [-12, -4, 4]) buildLamp(scene, x, -ROAD_EDGE - 0.6, 1);
-  for (const x of [6, 14]) buildLamp(scene, x, ROAD_EDGE + 0.6, -1); // old tomonda — kamerani to'smaydigan joylarda
+  for (const x of [6, 14, 26, 40, 54]) buildLamp(scene, x, ROAD_EDGE + 0.6, -1); // old tomonda — kamerani to'smaydigan joylarda
   // Uzoqdagi binolar (shahar fon) — ortda
-  for (let i = 0; i < 13; i++) {
-    const h = 10 + ((i * 37) % 7) * 2.2;
+  for (let i = 0; i < 20; i++) {
+    const h = 12 + ((i * 37) % 7) * 3;
     const bw = 6 + (i % 3) * 2;
-    const bld = mesh(new THREE.BoxGeometry(bw, h, 6), new THREE.MeshStandardMaterial({ map: facadeTex(0.25), roughness: 0.8 }), { x: -40 + i * 7.6, y: h / 2, z: -40 - (i % 2) * 4, shadow: false });
+    const bld = mesh(new THREE.BoxGeometry(bw, h, 6), new THREE.MeshStandardMaterial({ map: facadeTex(0.25), roughness: 0.8 }), { x: -50 + i * 7.6, y: h / 2, z: -78 - (i % 2) * 5, shadow: false });
     scene.add(bld);
   }
   // "P" belgisi kirishda
@@ -532,38 +613,324 @@ function buildWorld(scene) {
   return [buildBarrier(scene, -1), buildBarrier(scene, 1)];
 }
 
-// ---------- To'xtash maydoni: asfalt, bo'yalgan joylar, bordyur, yo'nalish o'qlari ----------
-function buildLot(scene) {
-  const cx = 19.6;
-  const cz = -12.3;
-  scene.add(mesh(new THREE.BoxGeometry(23, 0.02, 10.4), new THREE.MeshStandardMaterial({ map: asphaltTex([6, 2.8]), roughness: 0.92 }), { x: cx, y: 0.012, z: cz, shadow: false }));
-  // maydonga kirish yo'li (trotuar orqali)
-  scene.add(mesh(new THREE.BoxGeometry(3.4, 0.022, 3.2), new THREE.MeshStandardMaterial({ map: asphaltTex([1, 1]), roughness: 0.92 }), { x: 9.3, y: 0.013, z: -6.2, shadow: false }));
-  const white = mat(0xeceae4, { roughness: 0.8 });
-  for (const [z0, z1] of [[-8.1, -10.7], [-13.3, -15.9]]) {
-    for (let k = 0; k <= LOT.n; k++) {
-      const x = LOT.x0 - LOT.pitch / 2 + k * LOT.pitch;
-      scene.add(box(0.08, 0.01, Math.abs(z1 - z0), white, { x, y: 0.026, z: (z0 + z1) / 2, shadow: false }));
+// ---------- Garaj binosi: beton plitalar, ustunlar, panjaralar, alyumin qanotlar, spiral rampa, tom bog'i ----------
+// Har zona polida — chizilgan joylar va raqamlar (A-01 ...); premium A — oltin chiziqlar, nogironlar joyi — ko'k
+function zoneFloorTex(zone) {
+  return canvasTex(1024, 1040, (c, w, h) => {
+    const sx = w / (10 * PITCH);
+    const cy = (z) => (z - G.zB) * (h / (G.zF - G.zB)); // kanvas tepasi — garajning orqa cheti
+    c.fillStyle = zone === 'A' ? '#3a3a3e' : '#4a4d53';
+    c.fillRect(0, 0, w, h);
+    for (let i = 0; i < 5000; i++) {
+      c.fillStyle = `rgba(255,255,255,${Math.random() * 0.05})`;
+      c.fillRect(Math.random() * w, Math.random() * h, 2, 2);
     }
-    const back = z0 < -12 ? z1 : z0;
-    scene.add(box(LOT.n * LOT.pitch, 0.01, 0.08, white, { x: LOT.x0 - LOT.pitch / 2 + (LOT.n * LOT.pitch) / 2, y: 0.026, z: back, shadow: false }));
+    const line = zone === 'A' ? '#f2c230' : '#eceae4';
+    c.textAlign = 'center';
+    ROWS_Z.forEach((z, r) => {
+      const toward = r % 2 === 0 ? 1 : -1;
+      for (let k = 0; k < 10; k++) {
+        const x0 = k * PITCH * sx;
+        if (zone !== 'A' && zone !== 'E' && r === 0 && k < 2) { // nogironlar joyi
+          c.fillStyle = 'rgba(30,91,216,.55)';
+          c.fillRect(x0 + 3, cy(z - 1.3), PITCH * sx - 6, cy(z + 1.3) - cy(z - 1.3));
+        }
+        c.strokeStyle = line;
+        c.lineWidth = 5;
+        c.strokeRect(x0 + 3, cy(z - 1.3), PITCH * sx - 6, cy(z + 1.3) - cy(z - 1.3));
+        c.fillStyle = line;
+        c.font = 'bold 28px Arial';
+        c.fillText(`${zone}-${String(r * 10 + k + 1).padStart(2, '0')}`, x0 + (PITCH * sx) / 2, cy(z - toward * 1.05) + 10);
+      }
+    });
+    // yo'lakda katta zona harfi va harakat o'qlari
+    c.fillStyle = 'rgba(242,194,48,.85)';
+    c.font = 'bold 90px Arial';
+    c.fillText(zone, w / 2, cy(G.lane2) + 32);
+    c.font = 'bold 54px Arial';
+    c.fillText('→        →        →', w / 2, cy(G.lane1) + 18);
+  });
+}
+
+function buildGarage(scene) {
+  const W = G.x1 - G.x0;
+  const cx = (G.x0 + G.x1) / 2;
+  const cz = (G.zF + G.zB) / 2;
+  const D = G.zF - G.zB + 0.4;
+  // Har qavat — alohida guruh: mashina yuqori qavat ostida bo'lsa, ustki qavatlar "shaffof kesim" bo'lib ochiladi
+  const levels = [0, 1, 2].map(() => ({ group: new THREE.Group(), mats: [], fade: 1 }));
+  for (const L of levels) scene.add(L.group);
+  const fading = (lv, m) => {
+    levels[lv].mats.push(m);
+    return m;
+  };
+  const add = (lv, obj, fades = true) => {
+    obj.userData.fades = fades;
+    levels[lv].group.add(obj);
+    return obj;
+  };
+  const m4 = new THREE.Matrix4();
+  for (let lv = 0; lv < 3; lv++) {
+    const slab = fading(lv, mat(0xbdbab3, { roughness: 0.8 }));
+    // pol: 1-qavatda — yerdagi beton, yuqorida — qalin plita
+    if (lv === 0) add(0, mesh(new THREE.BoxGeometry(W, 0.08, D), slab, { x: cx, y: 0.04, z: cz, shadow: false })).receiveShadow = true;
+    else add(lv, mesh(new THREE.BoxGeometry(W, 0.3, D), slab, { x: cx, y: lv * FLOOR_H - 0.15, z: cz }));
+    // zona pollari (chizilgan joylar)
+    for (const [zone, [zl, bx]] of Object.entries(ZONE_POS)) {
+      if (zl !== lv) continue;
+      const p = mesh(new THREE.PlaneGeometry(10 * PITCH, G.zF - G.zB), fading(lv, new THREE.MeshStandardMaterial({ map: zoneFloorTex(zone), roughness: zone === 'A' ? 0.18 : 0.75, metalness: zone === 'A' ? 0.35 : 0 })), { x: bx + 5 * PITCH, y: lv * FLOOR_H + 0.09, z: cz, shadow: false });
+      p.rotation.x = -Math.PI / 2;
+      p.receiveShadow = true;
+      add(lv, p);
+    }
+    // ustunlar shu qavatning shipini ko'taradi (tomda yo'q): joylar chegarasida, oldi/o'rta/orqa qatorlarda
+    if (lv < 2) {
+      const at = [];
+      for (const z of [G.zF - 0.25, -16.9, G.zB + 0.25]) for (const bx of [11.8, 29.3]) for (let k = 0; k <= 10; k += 2) at.push([bx + k * PITCH, z]);
+      const cols = new THREE.InstancedMesh(new THREE.BoxGeometry(0.4, FLOOR_H - 0.3, 0.4), slab, at.length);
+      at.forEach(([x, z], i) => cols.setMatrixAt(i, m4.makeTranslation(x, lv * FLOOR_H + (FLOOR_H - 0.3) / 2, z)));
+      cols.castShadow = cols.receiveShadow = true;
+      add(lv, cols);
+    }
+    if (lv > 0) {
+      // panjaralar va oltin LED tasma; ship ostidagi yorug' chiziqlar (pastki qavatni yoritadi)
+      const parapet = fading(lv, mat(0xe9e6df, { roughness: 0.6 }));
+      const y = lv * FLOOR_H + 0.5;
+      add(lv, box(W, 1.0, 0.18, parapet, { x: cx, y, z: G.zF + 0.1 }));
+      add(lv, box(W, 1.0, 0.18, parapet, { x: cx, y, z: G.zB - 0.1 }));
+      add(lv, box(0.18, 1.0, D, parapet, { x: G.x0, y, z: cz }));
+      add(lv, box(W, 0.05, 0.2, fading(lv, mat(0xf2c230, { emissive: 0xf2c230, emissiveIntensity: 1.2 })), { x: cx, y: y + 0.52, z: G.zF + 0.11, shadow: false }));
+      const ceil = fading(lv, mat(0xfff6e0, { emissive: 0xfff6e0, emissiveIntensity: 1.6 }));
+      for (const z of [G.lane1, G.lane2]) add(lv, box(W - 2, 0.04, 0.25, ceil, { x: cx, y: lv * FLOOR_H - 0.32, z, shadow: false }));
+    }
   }
-  // yo'lakdagi o'qlar va "P" yozuvi
-  const arrow = textTexture('→   →   →', { font: 'bold 90px Arial' });
-  scene.add(decal(arrow, 9, 0.9, 20, LOT.aisleZ, 0));
-  // bordyur va butalar maydon atrofida
-  const curb = mat(0x9a9c9f, { roughness: 0.8 });
-  scene.add(box(23.4, 0.16, 0.25, curb, { x: cx + 0.9, y: 0.08, z: -17.6 }));
-  scene.add(box(0.25, 0.16, 10.4, curb, { x: 31.2, y: 0.08, z: cz }));
-  let seed = 40;
-  for (let x = 12; x <= 30; x += 2.2) scene.add(buildBush(x, -7.6, 0.8, seed++));
+  for (const [x, y, z] of [[20, 2.6, -14], [38, 2.6, -19], [20, 5.8, -19], [38, 5.8, -14]]) {
+    const l = new THREE.PointLight(0xfff1d6, 6, 16, 1.6);
+    l.position.set(x, y, z);
+    scene.add(l);
+  }
+  // old fasad: yuqori qavatlarda vertikal alyumin qanotlar (ichidagi mashinalar oralig'idan ko'rinadi)
+  const fins = [];
+  for (let x = G.x0 + 0.6; x < G.x1; x += 1.25) fins.push(x);
+  const finMesh = new THREE.InstancedMesh(new THREE.BoxGeometry(0.07, FLOOR_H + 1.3, 0.45), fading(1, mat(0xb8bcc2, { metalness: 0.8, roughness: 0.3 })), fins.length);
+  fins.forEach((x, i) => finMesh.setMatrixAt(i, m4.makeTranslation(x, FLOOR_H - 0.2 + (FLOOR_H + 1.3) / 2, G.zF + 0.35)));
+  finMesh.castShadow = true;
+  add(1, finMesh);
+
+  // Tom: quyosh panellari, bog' va chiroqlar (ular "kesim" paytida yashiriladi)
+  const roofY = 2 * FLOOR_H;
+  const panels = new THREE.InstancedMesh(new THREE.BoxGeometry(2.6, 0.06, 1.4), mat(0x1d2c4a, { metalness: 0.6, roughness: 0.25 }), 18);
+  const q = new THREE.Quaternion().setFromEuler(new THREE.Euler(-0.35, 0, 0));
+  const one = new THREE.Vector3(1, 1, 1);
+  for (let i = 0; i < 18; i++) {
+    m4.compose(new THREE.Vector3(32 + (i % 6) * 2.9, roofY + 0.55, -10.6 - Math.floor(i / 6) * 2.6), q, one);
+    panels.setMatrixAt(i, m4);
+  }
+  panels.castShadow = true;
+  add(2, panels, false);
+  add(2, mesh(new THREE.BoxGeometry(16, 0.3, 6.6), new THREE.MeshStandardMaterial({ map: grassTex([4, 2]), roughness: 1 }), { x: 39.5, y: roofY + 0.15, z: -21.6 }), false);
+  let seed = 70;
+  for (const x of [33, 37, 41, 45]) add(2, buildTree(x, -21.6, 0.6, seed++).translateY(roofY + 0.3), false);
+  const roofLamps = new THREE.Group();
+  roofLamps.position.y = roofY;
+  for (const x of [15, 23]) buildLamp(roofLamps, x, -16.9, 1);
+  add(2, roofLamps, false);
+
+  // Har joy ustida yo'naltiruvchi chiroq: yashil — bo'sh, qizil — band, ko'k — nogironlar uchun (haqiqiy garajlardagidek)
+  const sensors = [0, 1, 2].map((lv) => {
+    const im = new THREE.InstancedMesh(new THREE.SphereGeometry(0.11, 10, 8), new THREE.MeshBasicMaterial({ color: 0xffffff }), lv < 2 ? 80 : 40);
+    add(lv, im, false);
+    return im;
+  });
+  const sensorAt = {};
+  for (const zone of Object.keys(ZONE_POS)) {
+    for (let n = 1; n <= 40; n++) {
+      const st = stallFor(`${zone}-${String(n).padStart(2, '0')}`);
+      const im = sensors[st.level];
+      const i = (zone === 'B' || zone === 'D' ? 40 : 0) + n - 1;
+      // tomda ship yo'q — chiroq past ustuncha ustida
+      const y = st.level < 2 ? st.y + FLOOR_H - 0.55 : st.y + 1.1;
+      im.setMatrixAt(i, m4.makeTranslation(st.x, y, st.z - st.toward * 1.15));
+      im.setColorAt(i, new THREE.Color(0x2ee07a));
+      sensorAt[st.label] = [im, i];
+    }
+  }
+
+  // Spiral rampa: 2 aylanish (har biri bir qavat); tashqi devor va markaziy beton o'zak
+  const turns = 2;
+  const steps = 96;
+  const road = [];
+  const wall = [];
+  const idx = [];
+  for (let i = 0; i <= steps; i++) {
+    const f = i / steps;
+    const a = Math.PI + f * turns * Math.PI * 2;
+    const y = f * turns * FLOOR_H + 0.06;
+    for (const rr of [HELIX.r - 1.6, HELIX.r + 1.6]) road.push(HELIX.x + rr * Math.cos(a), y, HELIX.z + rr * Math.sin(a));
+    const ro = HELIX.r + 1.65;
+    wall.push(HELIX.x + ro * Math.cos(a), y, HELIX.z + ro * Math.sin(a), HELIX.x + ro * Math.cos(a), y + 1.0, HELIX.z + ro * Math.sin(a));
+    if (i < steps) idx.push(i * 2, i * 2 + 2, i * 2 + 1, i * 2 + 1, i * 2 + 2, i * 2 + 3);
+  }
+  const ribbon = (arr, material) => {
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.Float32BufferAttribute(arr, 3));
+    geo.setIndex(idx);
+    geo.computeVertexNormals();
+    const m = new THREE.Mesh(geo, material);
+    m.castShadow = m.receiveShadow = true;
+    return m;
+  };
+  scene.add(ribbon(road, mat(0x8f9196, { roughness: 0.9, side: THREE.DoubleSide })));
+  scene.add(ribbon(wall, mat(0xe9e6df, { roughness: 0.6, side: THREE.DoubleSide })));
+  const coreH = turns * FLOOR_H + 1.4;
+  scene.add(mesh(new THREE.CylinderGeometry(HELIX.r - 1.7, HELIX.r - 1.7, coreH, 32), mat(0xbdbab3, { roughness: 0.8 }), { x: HELIX.x, y: coreH / 2, z: HELIX.z }));
+  const crown = mesh(new THREE.TorusGeometry(HELIX.r - 1.65, 0.07, 8, 48), mat(0xf2c230, { emissive: 0xf2c230, emissiveIntensity: 1.4 }), { x: HELIX.x, y: coreH, z: HELIX.z });
+  crown.rotation.x = Math.PI / 2;
+  scene.add(crown);
+  const pTex = textTexture('P', { w: 128, h: 128, bg: '#2257d6', font: 'bold 96px Arial' });
+  const pSign = mesh(new THREE.PlaneGeometry(1.8, 1.8), new THREE.MeshStandardMaterial({ map: pTex, emissive: 0xffffff, emissiveMap: pTex, emissiveIntensity: 0.5 }), { x: HELIX.x - 0.9, y: coreH - 1.2, z: HELIX.z + HELIX.r - 1.55, shadow: false });
+  pSign.rotation.y = -0.4;
+  scene.add(pSign);
+  // garajga kirish yo'li
+  scene.add(mesh(new THREE.BoxGeometry(3.4, 0.022, 3.6), new THREE.MeshStandardMaterial({ map: asphaltTex([1, 1]), roughness: 0.92 }), { x: 9.9, y: 0.013, z: -6.4, shadow: false }));
+
+  // Kirishdagi jonli LED tablo: har qavatda nechta bo'sh joy
+  const boardCanvas = document.createElement('canvas');
+  boardCanvas.width = 512;
+  boardCanvas.height = 384;
+  const boardTex = new THREE.CanvasTexture(boardCanvas);
+  boardTex.colorSpace = THREE.SRGBColorSpace;
+  scene.add(box(0.16, 3.0, 0.16, mat(0x50555c, { metalness: 0.7 }), { x: 7.4, y: 1.5, z: -6.9 }));
+  const board = mesh(new THREE.BoxGeometry(1.9, 1.45, 0.12), [mat(0x1b1d21), mat(0x1b1d21), mat(0x1b1d21), mat(0x1b1d21),
+    new THREE.MeshStandardMaterial({ map: boardTex, emissive: 0xffffff, emissiveMap: boardTex, emissiveIntensity: 1 }), mat(0x1b1d21)], { x: 7.4, y: 3.4, z: -6.9 });
+  board.rotation.y = -0.55;
+  scene.add(board);
+  const drawBoard = (free) => {
+    const c = boardCanvas.getContext('2d');
+    c.fillStyle = '#0b0d10';
+    c.fillRect(0, 0, 512, 384);
+    c.fillStyle = '#2257d6';
+    c.fillRect(0, 0, 512, 84);
+    c.fillStyle = '#fff';
+    c.font = 'bold 56px Arial';
+    c.textAlign = 'center';
+    c.fillText('P  BO\'SH JOYLAR', 256, 62);
+    c.font = 'bold 50px monospace';
+    ['1-qavat', '2-qavat', '3-qavat'].forEach((t, i) => {
+      c.textAlign = 'left';
+      c.fillStyle = '#f2c230';
+      c.fillText(t, 26, 160 + i * 90);
+      c.textAlign = 'right';
+      c.fillStyle = free[i] > 0 ? '#33e08b' : '#ff4d4f';
+      c.fillText(free[i] > 0 ? String(free[i]) : "TO'LA", 486, 160 + i * 90);
+    });
+    boardTex.needsUpdate = true;
+  };
+  drawBoard([80, 80, 40]);
+
+  // ---------- Premium A: alohida dunyo — shisha devorchalar, oltin ship, peshtoq, kirish ramkasi ----------
+  const A0 = ZONE_POS.A[1];
+  const A1 = A0 + 10 * PITCH;
+  const glassP = new THREE.MeshPhysicalMaterial({ color: 0xd9c48a, metalness: 0.1, roughness: 0.05, transparent: true, opacity: 0.28, side: THREE.DoubleSide, depthWrite: false });
+  const gold = mat(0xd4a93a, { metalness: 0.9, roughness: 0.25 });
+  // joylar orasida shisha devorchalar (oltin tutqichli)
+  const divAt = [];
+  for (const z of ROWS_Z) for (let k = 1; k < 10; k++) divAt.push([A0 + k * PITCH, z]);
+  const divs = new THREE.InstancedMesh(new THREE.BoxGeometry(0.04, 1.1, 2.3), glassP, divAt.length);
+  const rails = new THREE.InstancedMesh(new THREE.BoxGeometry(0.06, 0.05, 2.3), gold, divAt.length);
+  divAt.forEach(([x, z], i) => {
+    divs.setMatrixAt(i, m4.makeTranslation(x, 0.6, z));
+    rails.setMatrixAt(i, m4.makeTranslation(x, 1.17, z));
+  });
+  add(0, divs, false);
+  add(0, rails, false);
+  // B zonasidan ajratuvchi shisha devor (yo'laklar ochiq qoladi)
+  for (const [z0, z1] of [[G.zF, -10.6], [-14.0, -19.8], [-23.2, G.zB]]) {
+    add(0, mesh(new THREE.BoxGeometry(0.06, FLOOR_H - 0.35, z0 - z1), glassP, { x: A1 + 0.05, y: (FLOOR_H - 0.35) / 2, z: (z0 + z1) / 2, shadow: false }), false);
+    add(0, box(0.1, 0.08, z0 - z1, gold, { x: A1 + 0.05, y: FLOOR_H - 0.38, z: (z0 + z1) / 2, shadow: false }), false);
+  }
+  // oltin nurli ship paneli va yo'lak bo'ylab oltin chiroqlar
+  const warm = mat(0xffd98a, { emissive: 0xffc861, emissiveIntensity: 1.5 });
+  for (const z of [-9.3, -15.3, -18.5, -24.5]) add(0, box(10 * PITCH - 0.4, 0.04, 1.4, warm, { x: (A0 + A1) / 2, y: FLOOR_H - 0.33, z, shadow: false }), false);
+  for (const z of [G.lane1, G.lane2]) add(0, box(10 * PITCH, 0.02, 0.12, mat(0xf2c230, { emissive: 0xf2c230, emissiveIntensity: 1.6 }), { x: (A0 + A1) / 2, y: 0.1, z: z + 1.6, shadow: false }), false);
+  for (const x of [A0 + 4, A1 - 4]) {
+    const l = new THREE.PointLight(0xffd08a, 7, 12, 1.5);
+    l.position.set(x, FLOOR_H - 0.6, -16.9);
+    scene.add(l);
+  }
+  // kirish ramkasi va "PREMIUM" peshtoqi (old tomonda, yo'lga qaragan)
+  const premTex = canvasTex(1024, 192, (c, w, h) => {
+    c.fillStyle = '#121316';
+    c.fillRect(0, 0, w, h);
+    const grd = c.createLinearGradient(0, 0, 0, h);
+    grd.addColorStop(0, '#fff3c2');
+    grd.addColorStop(0.5, '#f2c230');
+    grd.addColorStop(1, '#a8770a');
+    c.fillStyle = grd;
+    c.font = 'bold 118px Georgia, serif';
+    c.textAlign = 'center';
+    c.textBaseline = 'middle';
+    c.fillText('P R E M I U M', w / 2, h / 2 + 6);
+    c.strokeStyle = '#f2c230';
+    c.lineWidth = 6;
+    c.strokeRect(10, 10, w - 20, h - 20);
+  });
+  premTex.wrapS = premTex.wrapT = THREE.ClampToEdgeWrapping;
+  add(0, mesh(new THREE.PlaneGeometry(7.2, 1.35), new THREE.MeshStandardMaterial({ map: premTex, emissive: 0xffffff, emissiveMap: premTex, emissiveIntensity: 0.85 }), { x: (A0 + A1) / 2, y: FLOOR_H - 0.95, z: G.zF + 0.32, shadow: false }), false);
+  for (const x of [A0 - 0.05, A1 + 0.05]) add(0, box(0.22, FLOOR_H - 0.3, 0.22, gold, { x, y: (FLOOR_H - 0.3) / 2, z: G.zF + 0.2 }), false);
+
+  // ---------- Zona belgisi: tanlangan zona atrofida yonib turuvchi oltin ramka va yozuv ----------
+  const marker = new THREE.Group();
+  const glow = new THREE.MeshBasicMaterial({ color: 0xffcf4a, transparent: true, opacity: 0.9, depthWrite: false });
+  const mw = 10 * PITCH + 0.3;
+  const md = G.zF - G.zB + 0.2;
+  for (const [w, d, x, z] of [[mw, 0.4, 0, md / 2], [mw, 0.4, 0, -md / 2], [0.4, md, mw / 2, 0], [0.4, md, -mw / 2, 0]]) marker.add(mesh(new THREE.BoxGeometry(w, 0.35, d), glow, { x, y: 0.17, z, shadow: false }));
+  const fill = mesh(new THREE.PlaneGeometry(mw, md), new THREE.MeshBasicMaterial({ color: 0xffcf4a, transparent: true, opacity: 0.12, depthWrite: false }), { y: 0.02, shadow: false });
+  fill.rotation.x = -Math.PI / 2;
+  marker.add(fill);
+  const tagCanvas = document.createElement('canvas');
+  tagCanvas.width = 512;
+  tagCanvas.height = 160;
+  const tagTex = new THREE.CanvasTexture(tagCanvas);
+  tagTex.colorSpace = THREE.SRGBColorSpace;
+  const tag = new THREE.Sprite(new THREE.SpriteMaterial({ map: tagTex, depthTest: false, transparent: true }));
+  tag.scale.set(9.6, 3, 1);
+  tag.position.y = 3.4;
+  tag.renderOrder = 10;
+  marker.add(tag);
+  marker.visible = false;
+  scene.add(marker);
+  const showZone = (zone) => {
+    const [lv, bx] = ZONE_POS[zone];
+    marker.position.set(bx + 5 * PITCH, lv * FLOOR_H + 0.14, cz);
+    const c = tagCanvas.getContext('2d');
+    c.clearRect(0, 0, 512, 160);
+    c.fillStyle = zone === 'A' ? 'rgba(18,19,22,.92)' : 'rgba(34,87,214,.92)';
+    c.beginPath();
+    c.roundRect(6, 6, 500, 148, 28);
+    c.fill();
+    c.strokeStyle = '#f2c230';
+    c.lineWidth = 6;
+    c.stroke();
+    c.fillStyle = '#fff';
+    c.textAlign = 'center';
+    c.font = 'bold 64px Arial';
+    c.fillText(zone === 'A' ? 'A · Premium' : `Zona ${zone}`, 256, 78);
+    c.font = '36px Arial';
+    c.fillStyle = '#f2c230';
+    c.fillText(`${lv + 1}-qavat${lv === 2 ? ' (ochiq tom)' : ''}`, 256, 128);
+    tagTex.needsUpdate = true;
+    return { x: bx + 5 * PITCH, y: lv * FLOOR_H, z: cz, level: lv };
+  };
+  return { levels, drawBoard, sensorAt, marker, showZone };
 }
 
 // ---------- Savdo markazi: egri shisha fasad, to'lqinli tom-soyabon, burama minora ----------
 // Yozuv: "Tashkent City Mall" — podium tepasida, maydonga qaragan
 function buildMall(scene) {
   const g = new THREE.Group();
-  g.position.set(21, 0, -21.5);
+  g.position.set(32, 0, -42);
+  g.scale.setScalar(1.7);
   scene.add(g);
   const glass = new THREE.MeshPhysicalMaterial({ color: 0x8fb4d6, metalness: 0.6, roughness: 0.06, clearcoat: 1, transparent: true, opacity: 0.88, side: THREE.DoubleSide });
   const glassTex = canvasTex(512, 256, (c, w, h) => {
@@ -676,17 +1043,26 @@ function buildMall(scene) {
   const board = mesh(new THREE.PlaneGeometry(17, 2.1), new THREE.MeshStandardMaterial({ map: sign, transparent: true, emissive: 0xffffff, emissiveMap: sign, emissiveIntensity: 0.9 }), { y: H + 1.15, z: 2.3, shadow: false });
   g.add(board);
 
-  // Oldidagi maydoncha: plitka, gulzorlar, bayroqlar, daraxtlar
-  scene.add(mesh(new THREE.BoxGeometry(30, 0.06, 2.0), new THREE.MeshStandardMaterial({ map: tileTex([12, 1.4]), roughness: 0.85 }), { x: 21, y: 0.03, z: -18.6, shadow: false }));
-  for (const x of [7, 35]) scene.add(buildTree(x, -20, 1.1, x));
+  // Garaj bilan savdo markazi orasidagi maydon: plitka, daraxtlar, bayroqlar
+  scene.add(mesh(new THREE.BoxGeometry(46, 0.06, 16), new THREE.MeshStandardMaterial({ map: tileTex([18, 6]), roughness: 0.85 }), { x: 32, y: 0.03, z: -34, shadow: false }));
+  for (const [x, z] of [[9, -31], [55, -31], [13, -36], [51, -36]]) scene.add(buildTree(x, z, 1.2, x));
   const flagCloth = [0x1eb5e0, 0xf4f3ef, 0x1fa35a];
   for (let i = 0; i < 3; i++) {
-    const fx = 16 + i * 1.2;
-    scene.add(mesh(new THREE.CylinderGeometry(0.03, 0.03, 4, 8), mat(0xd9dde3, { metalness: 1, roughness: 0.2 }), { x: fx, y: 2, z: -18.4 }));
-    const cloth = mesh(new THREE.PlaneGeometry(0.9, 0.55, 8, 4), mat(flagCloth[i], { side: THREE.DoubleSide, roughness: 0.8 }), { x: fx + 0.45, y: 3.65, z: -18.4 });
+    const fx = 24.4 + i * 1.2;
+    scene.add(mesh(new THREE.CylinderGeometry(0.03, 0.03, 4, 8), mat(0xd9dde3, { metalness: 1, roughness: 0.2 }), { x: fx, y: 2, z: -35.5 }));
+    const cloth = mesh(new THREE.PlaneGeometry(0.9, 0.55, 8, 4), mat(flagCloth[i], { side: THREE.DoubleSide, roughness: 0.8 }), { x: fx + 0.45, y: 3.65, z: -35.5 });
     scene.add(cloth);
     g.userData.flags = [...(g.userData.flags || []), cloth];
   }
+  // Shisha piyodalar ko'prigi: garaj tomidan savdo markazi 2-qavatiga
+  const bridge = new THREE.Group();
+  bridge.position.set(32, 2 * FLOOR_H, -32.15);
+  const bridgeGlass = new THREE.MeshPhysicalMaterial({ color: 0xbfd6ea, metalness: 0.2, roughness: 0.05, transparent: true, opacity: 0.32, side: THREE.DoubleSide, depthWrite: false });
+  bridge.add(box(3, 0.25, 12.5, slab, { y: -0.12 }), box(3.3, 0.14, 12.7, slab, { y: 2.66 }));
+  bridge.add(mesh(new THREE.BoxGeometry(3, 2.55, 12.5), bridgeGlass, { y: 1.3, shadow: false }));
+  for (const x of [-1.5, 1.5]) bridge.add(box(0.05, 0.05, 12.5, mat(0xf2c230, { emissive: 0xf2c230, emissiveIntensity: 1.3 }), { x, y: 0.03, shadow: false }));
+  for (const z of [-3, 3]) bridge.add(mesh(new THREE.CylinderGeometry(0.22, 0.28, 2 * FLOOR_H, 14), slab, { y: -FLOOR_H, z }));
+  scene.add(bridge);
   return g;
 }
 
@@ -703,12 +1079,12 @@ function buildWalkers(scene) {
     const p = buildGuard(c);
     p.scale.setScalar(0.95);
     scene.add(p);
-    const x = 14 + i * 3;
-    // aylanma yo'l: joylar orasidan → plitka → eshik oldi → qaytish
-    const loop = new THREE.CatmullRomCurve3([
-      new THREE.Vector3(x, 0, -11.8), new THREE.Vector3(x + 0.6, 0, -16.6), new THREE.Vector3(20 + (i - 2) * 0.6, 0, -19.0),
-      new THREE.Vector3(21 + (i - 2) * 0.4, 0, -13.2 - 0.0), new THREE.Vector3(x - 0.4, 0, -12.4),
-    ], true, 'centripetal');
+    const x = 16 + i * 6;
+    // aylanma yo'l: garaj ortidan → maydon → eshik oldi → qaytish; ikkitasi ko'prikda
+    const pts = i >= 3
+      ? [[31.4 + (i - 3) * 1.1, 6.4, -27], [31.4 + (i - 3) * 1.1, 6.4, -37.6], [32 + (i - 3) * 1.1, 6.4, -37.6], [32 + (i - 3) * 1.1, 6.4, -27]]
+      : [[x, 0, -26.8], [x + 0.6, 0, -31], [32 + (i - 1) * 0.6, 0, -36.8], [32 + (i - 1) * 0.4, 0, -32], [x - 0.4, 0, -27.4]];
+    const loop = new THREE.CatmullRomCurve3(pts.map(([px, py, pz]) => new THREE.Vector3(px, py, pz)), true, 'centripetal');
     return { p, loop, len: loop.getLength(), s: (i * 0.23) % 1, speed: 1.0 + (i % 3) * 0.15 };
   });
 }
@@ -717,7 +1093,7 @@ function buildWalkers(scene) {
 const GUARD_SEATED = { uniform: 0x2f4a3a, cap: 0x23362b, skin: 0xd9a77e, mustache: 0xd8d8d8, vest: false, girth: 1.15, brows: 0xbfbfbf };
 const GUARD_OUTSIDE = { uniform: 0x24448f, cap: 0x1b2a55, skin: 0xe8b98f, mustache: null, vest: true, girth: 1, brows: 0x3a2a20 };
 
-export default function Gate3D({ event, arrival, reject, release, onPlateRead }) {
+export default function Gate3D({ event, arrival, reject, release, spots, focusZone, onPlateRead }) {
   const mount = useRef(null);
   const bubble = useRef(null);
   const camBox = useRef(null);
@@ -727,6 +1103,25 @@ export default function Gate3D({ event, arrival, reject, release, onPlateRead })
   const [big, setBig] = useState(false); // butun ekran
   const onRead = useRef(onPlateRead);
   useEffect(() => { onRead.current = onPlateRead; }, [onPlateRead]);
+  // Garajdagi mashinalar — real bandlik: animIn — hali yo'lda (joyida ko'rsatilmaydi), pendingOut — chiqish navbatida (joyida turadi)
+  const spotsRef = useRef(spots);
+  const syncReq = useRef(true);
+  const animIn = useRef(new Set());
+  const pendingOut = useRef(new Set());
+  const parkedRef = useRef(new Map()); // label → { car, plate, goneAt }
+  const focusReq = useRef(null); // qorovul zona tugmasini bosdi — 3D shu zonani ko'rsatadi
+  const firstZone = useRef(true);
+  useEffect(() => {
+    if (firstZone.current) {
+      firstZone.current = false;
+      return;
+    }
+    if (focusZone) focusReq.current = focusZone;
+  }, [focusZone]);
+  useEffect(() => {
+    spotsRef.current = spots;
+    syncReq.current = true;
+  }, [spots]);
 
   useEffect(() => {
     const el = mount.current;
@@ -739,59 +1134,97 @@ export default function Gate3D({ event, arrival, reject, release, onPlateRead })
 
     const scene = new THREE.Scene();
     scene.background = skyTex();
-    scene.fog = new THREE.Fog(0xd8d3c8, 34, 85);
+    scene.fog = new THREE.Fog(0xd8d3c8, 55, 160);
     const pmrem = new THREE.PMREMGenerator(renderer);
     scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
     renderer.toneMappingExposure = 1.05;
-    const camera = new THREE.PerspectiveCamera(40, 1, 0.1, 160);
+    const camera = new THREE.PerspectiveCamera(46, 1, 0.1, 260);
     const plateCam = new THREE.PerspectiveCamera(12, 16 / 10, 0.1, 40); // tor burchakli raqam kamerasi
 
     scene.add(new THREE.HemisphereLight(0xdfe6ff, 0x30343a, 1.3));
     const sun = new THREE.DirectionalLight(0xffe7c4, 2.6); // past quyosh — uzun soyalar
-    sun.position.set(-6, 16, 8);
-    sun.target.position.set(8, 0, -8);
+    sun.position.set(2, 21, 3);
+    sun.target.position.set(20, 0, -18);
     scene.add(sun.target);
     sun.castShadow = true;
-    sun.shadow.mapSize.set(2048, 2048);
-    Object.assign(sun.shadow.camera, { left: -30, right: 30, top: 26, bottom: -26, far: 90 });
+    sun.shadow.mapSize.set(4096, 4096);
+    Object.assign(sun.shadow.camera, { left: -45, right: 45, top: 40, bottom: -40, far: 120 });
     sun.shadow.bias = -0.0004;
     scene.add(sun);
 
     const barriers = buildWorld(scene);
-    buildLot(scene);
+    const garage = buildGarage(scene);
     const mall = buildMall(scene);
     const walkers = buildWalkers(scene);
 
-    // Maydondagi joylar: qaysi joyda qaysi mashina turibdi
-    const lot = STALLS.map((st) => ({ ...st, car: null, plate: null, reserved: false, since: 0 }));
-    const parkAt = (st, car, plate) => {
-      car.position.set(st.x, 0, st.z);
+    // To'xtab turgan mashinalar (yengil model) — serverdagi band joylar bilan bir xil
+    const parked = parkedRef.current;
+    parked.clear();
+    const removeParked = (label) => {
+      const p = parked.get(label);
+      if (!p) return;
+      p.car.parent?.remove(p.car);
+      parked.delete(label);
+    };
+    const addParked = (s) => {
+      const st = stallFor(s.label);
+      if (!st) return;
+      const car = buildParkedCar(shapeFor(brandFor(s.plate, s.zone === 'A')), paintFor(s.plate));
+      car.position.set(st.x, st.y, st.z);
       car.rotation.y = st.rot;
-      car.visible = true;
-      Object.assign(st, { car, plate, reserved: false, since: performance.now() });
+      garage.levels[st.level].group.add(car);
+      parked.set(s.label, { car, plate: s.plate, goneAt: null });
     };
-    // Bo'sh joy: savdo markaziga yaqin qatordan; to'lsa — eng eski mashina ketgan hisoblanadi
-    const freeStall = () => {
-      const free = lot.filter((st) => !st.car && !st.reserved).sort((a, b) => (a.row === b.row ? a.x - b.x : a.row === 'B' ? -1 : 1));
-      if (free.length) return free[Math.floor(Math.random() * Math.min(4, free.length))];
-      const oldest = lot.filter((st) => st.car).sort((a, b) => a.since - b.since)[0];
-      if (!oldest) return null;
-      scene.remove(oldest.car);
-      Object.assign(oldest, { car: null, plate: null });
-      return oldest;
+    const parkedLabel = (ev) => (ev.label && parked.has(ev.label) ? ev.label : [...parked].find(([, p]) => p.plate === ev.plate)?.[0] ?? ev.label);
+    const SENSOR = { free: new THREE.Color(0x2ee07a), busy: new THREE.Color(0xff3b3b), acc: new THREE.Color(0x3b82ff), off: new THREE.Color(0x555a60) };
+    const sync = (time) => {
+      const list = spotsRef.current || [];
+      const busy = new Map(list.filter((s) => s.is_busy && s.plate).map((s) => [s.label, s]));
+      for (const [label, p] of parked) {
+        const s = busy.get(label);
+        if (animIn.current.has(label) || (s && s.plate !== p.plate)) removeParked(label);
+        else if (s || pendingOut.current.has(label)) p.goneAt = null;
+        else if (p.goneAt === null) p.goneAt = time + 2.5; // chiqish voqeasi bazadan biroz kechikib kelishi mumkin
+        else if (time > p.goneAt) removeParked(label);
+      }
+      for (const [label, s] of busy) if (!parked.has(label) && !animIn.current.has(label)) addParked(s);
+      const free = [0, 0, 0];
+      for (const s of list) {
+        const sensor = garage.sensorAt[s.label];
+        if (!sensor) continue;
+        const taken = s.is_busy || animIn.current.has(s.label);
+        if (!taken && !s.is_disabled) free[ZONE_POS[s.zone][0]]++;
+        sensor[0].setColorAt(sensor[1], s.is_disabled ? SENSOR.off : taken ? SENSOR.busy : s.is_accessible ? SENSOR.acc : SENSOR.free);
+        sensor[0].instanceColor.needsUpdate = true;
+      }
+      if (list.length) garage.drawBoard(free);
+      placeWashers();
     };
-    // Boshida maydonda bir nechta mashina turibdi
-    const DECOR = [[0xc9ccd1, 'sedan'], [0x3b4a6b, 'suv'], [0x8a2f2f, 'sedan'], [0xe6e3dc, 'sport'], [0x1f2226, 'suv'], [0x9a7b4f, 'sedan'], [0x5b6f8a, 'sedan'], [0x4f5a52, 'suv']];
-    for (const [i, [paint, type]] of DECOR.entries()) {
-      const st = lot[(i * 7 + 3) % lot.length];
-      if (st.car) continue;
-      const c = buildCar(type);
-      c.userData.paint.color.set(paint);
-      c.userData.setPlate(`${10 + i * 10}A${120 + i * 53}BA`);
-      scene.add(c);
-      parkAt(st, c, null);
-    }
-    const camTarget = new THREE.Vector3(6.5, 2.2, -8);
+    const WASHER = { uniform: 0xf2c230, cap: 0x1b1d21, skin: 0xd9a77e, mustache: null, vest: false, girth: 1, brows: 0x2a1d14 };
+    const washers = [0, 1].map(() => {
+      const w = buildGuard(WASHER);
+      w.scale.setScalar(0.95);
+      w.visible = false;
+      scene.add(w);
+      return w;
+    });
+    const placeWashers = () => {
+      const premium = [...parked.keys()].filter((l) => l.startsWith('A-')).sort();
+      washers.forEach((w, i) => {
+        const st = stallFor(premium[Math.floor((i * premium.length) / 2)]);
+        w.visible = !!st && premium.length > i;
+        if (!st) return;
+        w.position.set(st.x + 0.85, 0.02, st.z + st.toward * 0.2);
+        w.rotation.y = Math.PI; // mashinaga qaragan
+      });
+    };
+    let focus = null;
+    let camK = 1;
+    const transits = []; // shlagbaumdan o'tib, o'z joyiga ketayotgan mashinalar — yo'lak keyingi mashinaga bo'shaydi
+    let nextSync = 0;
+    let cutLevel = null;
+    let cutUntil = 0;
+    const camTarget = new THREE.Vector3(13, 2.6, -9.5);
     const camGoal = new THREE.Vector3();
     const seated = buildGuard(GUARD_SEATED);
     seated.position.copy(SEAT).setY(0.15);
@@ -828,29 +1261,23 @@ export default function Gate3D({ event, arrival, reject, release, onPlateRead })
         let car = cars[lane];
         if (!current.current[lane] && queue.current[lane].length) {
           const ev = queue.current[lane].shift();
+          const out = ev.type === 'exit' || ev.type === 'expel';
+          const label = out ? parkedLabel(ev) : ev.label;
+          if (out) {
+            removeParked(label);
+            pendingOut.current.delete(label);
+          }
+          if (still && ev.type === 'enter') animIn.current.delete(label);
+          syncReq.current = true;
           if (!still) {
             let plan = {};
-            if (ev.type === 'enter' || ev.type === 'arrive') {
-              const st = freeStall();
-              if (st) {
-                st.reserved = true;
-                plan = { stall: st, motion: enterMotion(st) };
-              }
-            } else {
-              const occupied = lot.filter((st) => st.car);
-              const st = lot.find((x) => x.car && x.plate === ev.plate) || occupied[Math.floor(Math.random() * occupied.length)];
-              if (st) {
-                plan = { stall: st, motion: exitMotion(st), lotCar: st.car };
-                Object.assign(st, { car: null, plate: null });
-              }
-            }
+            const stall = stallFor(label);
+            if (ev.type === 'enter') plan = { stall, motion: stall ? enterMotion(stall) : makeMotion([{ pts: DRIVEWAY_IN, speed: 3.6 }]) };
+            else if (out && stall) plan = { stall, motion: exitMotion(stall) };
             current.current[lane] = { fn: SCENES[ev.type], t: 0, ev, read: false, plan };
-            // markaga mos kuzov turi (sedan / suv / sport); chiqishda — maydondagi mashina
-            const type = shapeFor(brandFor(ev.plate, false));
-            if (plan.lotCar) {
-              scene.remove(cars[lane]);
-              cars[lane] = plan.lotCar;
-            } else if (cars[lane].userData.type !== type) {
+            // markaga mos kuzov turi (sedan / suv / sport)
+            const type = shapeFor(brandFor(ev.plate, stall?.zone === 'A'));
+            if (cars[lane].userData.type !== type) {
               scene.remove(cars[lane]);
               cars[lane] = buildCar(type);
               scene.add(cars[lane]);
@@ -868,32 +1295,81 @@ export default function Gate3D({ event, arrival, reject, release, onPlateRead })
         cur.t += dt;
         const st = cur.fn(cur.t, cur.plan);
         car.rotation.y = st.car.rot;
-        driveCar(car, st.car.x, st.car.z, dt);
+        driveCar(car, st.car.x, st.car.z, dt, st.car.y ?? 0, st.car.pitch ?? 0);
         // Mashina to'xtagach kamera raqamni "aniqlaydi"
         if (st.hold && cur.t > 3.2 && !cur.read) {
           cur.read = true;
           onRead.current?.(cur.ev.plate);
         }
-        if (st.done) {
+        if (st.detach) {
+          // shlagbaum yopildi: mashina o'z yo'lida davom etadi, darvoza keyingisini kutadi
+          transits.push({ car, plan: cur.plan, t: cur.t });
           current.current[lane] = null;
-          if (st.parked && cur.plan.stall) {
-            // joyida qoladi; yo'lak uchun yangi mashina
-            parkAt(cur.plan.stall, car, cur.ev.plate);
-            cars[lane] = buildCar();
-            cars[lane].visible = false;
-            scene.add(cars[lane]);
-          } else {
-            if (cur.plan.stall?.reserved) cur.plan.stall.reserved = false; // qaytarildi — joy bo'sh
-            car.visible = false;
-            if (cur.plan.lotCar) {
-              scene.remove(car);
-              cars[lane] = buildCar();
-              cars[lane].visible = false;
-              scene.add(cars[lane]);
-            }
-          }
+          cars[lane] = buildCar();
+          cars[lane].visible = false;
+          scene.add(cars[lane]);
+        } else if (st.done) {
+          current.current[lane] = null;
+          car.visible = false;
+          if (st.parked && cur.plan.stall) animIn.current.delete(cur.plan.stall.label);
+          syncReq.current = true;
         }
         states[lane] = { ...st, lane, plate: cur.ev.plate };
+      }
+
+      // Joyiga ketayotgan mashinalar; yetib borgach yengil modelga almashadi (sinxronlash shu kadrda)
+      for (let i = transits.length - 1; i >= 0; i--) {
+        const tr = transits[i];
+        tr.t += dt;
+        const k = tr.t - GO;
+        const p = tr.plan.motion.at(k);
+        tr.car.rotation.y = p.rot;
+        driveCar(tr.car, p.x, p.z, dt, p.y, p.pitch);
+        if (k > tr.plan.motion.total + 0.4) {
+          scene.remove(tr.car);
+          transits.splice(i, 1);
+          if (tr.plan.stall) animIn.current.delete(tr.plan.stall.label);
+          syncReq.current = true;
+        }
+      }
+      if (syncReq.current || time > nextSync) {
+        syncReq.current = false;
+        nextSync = time + 0.5;
+        sync(time);
+      }
+
+      for (const w of washers) if (w.visible) poseGuard(w, 'wave', time, dt, null);
+      if (focusReq.current) {
+        focus = { ...garage.showZone(focusReq.current), until: time + 7 };
+        focusReq.current = null;
+        garage.marker.visible = true;
+      }
+      if (focus && time > focus.until) {
+        focus = null;
+        garage.marker.visible = false;
+      }
+      if (focus) for (const c of garage.marker.children) c.material.opacity = (c.isSprite ? 1.4 : c.geometry.type === 'PlaneGeometry' ? 0.22 : 1.2) * (0.6 + 0.4 * Math.sin(time * 5));
+
+      // Garaj "kesimi": mashina pastki qavatda yursa, ustidagi qavatlar shaffof bo'lib, ichkari ko'rinadi
+      const mover = (states.in?.moving && cars.in.visible && cars.in) || transits.at(-1)?.car || (states.out?.moving && cars.out.visible && cars.out) || null;
+      const mp = mover?.position;
+      if (mp && mp.x > G.x0 - 0.5 && mp.x < G.x1 + 0.3 && mp.z < G.zF + 0.5 && mp.z > G.zB - 0.5) {
+        cutLevel = Math.round(mp.y / FLOOR_H);
+        cutUntil = time + 1.8;
+      } else if (time > cutUntil) cutLevel = null;
+      if (focus) cutLevel = focus.level;
+      for (const [lv, L] of garage.levels.entries()) {
+        L.fade += ((cutLevel !== null && lv > cutLevel ? 0 : 1) - L.fade) * Math.min(1, dt * 3);
+        const ghost = L.fade < 0.995;
+        for (const m of L.mats) {
+          if (m.transparent !== ghost) {
+            m.transparent = ghost;
+            m.depthWrite = !ghost;
+            m.needsUpdate = true;
+          }
+          m.opacity = 0.12 + 0.88 * L.fade;
+        }
+        for (const c of L.group.children) if (!c.userData.fades) c.visible = L.fade > 0.55;
       }
 
       // Har yo'lakning o'z shlagbaumi; harakatlanganda chiroq miltillaydi
@@ -944,11 +1420,12 @@ export default function Gate3D({ event, arrival, reject, release, onPlateRead })
       }
 
       // Kamera: savdo markazi, maydon va darvoza bir kadrda; harakatdagi mashinani yumshoq kuzatadi
-      const mover = states.in?.moving && cars.in.visible ? cars.in : states.out?.moving && cars.out.visible ? cars.out : null;
-      camGoal.set(6.5, 2.2, -8);
-      if (mover) camGoal.lerp(look.set(mover.position.x, 1.2, mover.position.z), 0.4);
+      camGoal.set(13, 2.6, -9.5);
+      if (focus) camGoal.set(focus.x - 2, focus.y + 1, focus.z + 2);
+      else if (mover) camGoal.lerp(look.set(mover.position.x, mover.position.y + 1.2, mover.position.z), 0.55);
       camTarget.lerp(camGoal, Math.min(1, dt * 1.1));
-      camera.position.set(camTarget.x - 15 + Math.sin(time * 0.15) * 0.4, 9.6, camTarget.z + 18.5);
+      camK = lerp(camK, focus ? 0.55 : 1, Math.min(1, dt * 1.5)); // zona ko'rsatilganda yaqinroq
+      camera.position.set(camTarget.x - 19 * camK + Math.sin(time * 0.15) * 0.4, (14 + camTarget.y * 0.8) * camK + camTarget.y * (1 - camK), camTarget.z + 27 * camK);
       camera.lookAt(camTarget);
       const w = el.clientWidth;
       const h = el.clientHeight;
@@ -1032,7 +1509,11 @@ export default function Gate3D({ event, arrival, reject, release, onPlateRead })
   // Chek berildi — kutayotgan mashina shlagbaum oldidan kiradi
   useEffect(() => {
     const cur = current.current.in;
-    if (release && cur?.ev.type === 'arrive' && cur.ev.plate === release.plate) current.current.in = { ...cur, fn: enterScene, t: 2.4 };
+    if (!release || cur?.ev.type !== 'arrive' || cur.ev.plate !== release.plate) return;
+    const stall = stallFor(release.label);
+    if (stall) animIn.current.add(stall.label);
+    syncReq.current = true;
+    current.current.in = { ...cur, fn: enterScene, t: 2.4, plan: { stall, motion: stall ? enterMotion(stall) : makeMotion([{ pts: DRIVEWAY_IN, speed: 3.6 }]) } };
   }, [release]);
 
   // Kiritib bo'lmadi — kutayotgan mashina orqaga qaytadi
@@ -1047,6 +1528,13 @@ export default function Gate3D({ event, arrival, reject, release, onPlateRead })
     const lane = event.type === 'enter' ? 'in' : 'out';
     const waitingNow = current.current.in?.ev.type === 'arrive' && current.current.in.ev.plate === event.plate;
     if (lane === 'in' && (waitingNow || queue.current.in.some((x) => x.type === 'arrive' && x.plate === event.plate))) return;
+    if (lane === 'in') animIn.current.add(event.label);
+    else {
+      const p = parkedRef.current;
+      const label = event.label && p.has(event.label) ? event.label : [...p].find(([, v]) => v.plate === event.plate)?.[0] ?? event.label;
+      if (label) pendingOut.current.add(label);
+    }
+    syncReq.current = true;
     queue.current[lane].push(event);
   }, [event]);
 

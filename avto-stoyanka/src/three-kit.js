@@ -1,6 +1,7 @@
 // Umumiy 3D qismlar: yordamchilar, mashina, qorovul/personaj skeleti va pozalari.
 // Darvoza sahnasi (Gate3D) va kirish sahifasi (LoginScene) ishlatadi.
 import * as THREE from 'three';
+import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 
 export const clamp01 = (t) => Math.min(1, Math.max(0, t));
 export const smooth = (t) => t * t * (3 - 2 * t);
@@ -395,7 +396,8 @@ export function poseGuard(guard, mode, time, dt, lookAt) {
 }
 
 // Mashina fizikasi: tezlik, tezlanish → g'ildirak aylanishi, burun egilishi, stop-chiroq
-export function driveCar(car, x, z, dt) {
+// y — qavat balandligi (rampada ko'tariladi), pitch — rampada burun ko'tarilishi
+export function driveCar(car, x, z, dt, y = 0, pitch = 0) {
   const u = car.userData;
   if (u.lastX === null) {
     u.lastX = x;
@@ -409,11 +411,46 @@ export function driveCar(car, x, z, dt) {
   u.v = v;
   u.lastX = x;
   u.lastZ = z;
-  car.position.set(x, 0, z);
+  car.position.set(x, y, z);
+  car.rotation.z = pitch;
   for (const w of u.wheels) w.rotation.z -= fwd / u.wheelR;
   // tormozda burun pastga, tezlanishda orqaga cho'kadi
   u.body.rotation.z = lerp(u.body.rotation.z, THREE.MathUtils.clamp(u.a * -0.006, -0.05, 0.05), Math.min(1, dt * 8));
   u.body.position.y = Math.sin(performance.now() / 90) * 0.004 * Math.min(1, Math.abs(v) / 3); // yo'l titrashi
   const braking = Math.abs(v) < 0.3 || u.a * Math.sign(v || 1) < -0.5;
   u.tail.emissiveIntensity = lerp(u.tail.emissiveIntensity, braking ? 2.2 : 0.4, Math.min(1, dt * 10));
+}
+
+// ---------- To'xtab turgan mashina (yengil): har kuzov turi uchun bir marta yasalgan birlashtirilgan geometriya ----------
+// 200 ta mashina sahnani og'irlashtirmasin: har biri 3 ta mesh (bo'yoq, qora qismlar, soya)
+const liteCache = {};
+const paintCache = new Map();
+const liteDark = new THREE.MeshPhysicalMaterial({ color: 0x0f1318, metalness: 0.3, roughness: 0.15, clearcoat: 1 });
+function liteGeos(type) {
+  if (liteCache[type]) return liteCache[type];
+  const T = CAR_TYPES[type] || CAR_TYPES.sedan;
+  const lower = new THREE.ExtrudeGeometry(profileShape(T.lower), { depth: T.width - 0.08, bevelEnabled: true, bevelSize: 0.03, bevelThickness: 0.04, bevelSegments: 1, curveSegments: 8 });
+  lower.translate(0, 0, -(T.width - 0.08) / 2);
+  const cabin = new THREE.ExtrudeGeometry(profileShape(T.cabin), { depth: T.width - 0.2, bevelEnabled: false, curveSegments: 6 });
+  cabin.translate(0, 0, -(T.width - 0.2) / 2);
+  const dark = [cabin];
+  const half = T.width / 2;
+  for (const [x, z] of [[T.wheelX, half - 0.04], [-T.wheelX, half - 0.04], [T.wheelX, -half + 0.04], [-T.wheelX, -half + 0.04]]) {
+    const w = new THREE.CylinderGeometry(T.wheelR, T.wheelR, 0.2, 12);
+    w.rotateX(Math.PI / 2);
+    w.translate(x, T.wheelR, z);
+    dark.push(w.toNonIndexed());
+  }
+  liteCache[type] = { paint: lower, dark: mergeGeometries(dark) };
+  return liteCache[type];
+}
+export function buildParkedCar(type, color) {
+  const g = liteGeos(type);
+  if (!paintCache.has(color)) paintCache.set(color, new THREE.MeshPhysicalMaterial({ color, metalness: 0.55, roughness: 0.32, clearcoat: 1, clearcoatRoughness: 0.08 }));
+  const car = new THREE.Group();
+  const body = new THREE.Mesh(g.paint, paintCache.get(color));
+  body.castShadow = true;
+  const dark = new THREE.Mesh(g.dark, liteDark);
+  car.add(body, dark, contactShadow(2.9, (CAR_TYPES[type] || CAR_TYPES.sedan).width + 0.55));
+  return car;
 }
