@@ -36,7 +36,9 @@ const ZONE_POS = { A: [0, 11.8], B: [0, 29.3], C: [1, 11.8], D: [1, 29.3], E: [2
 const HELIX = { x: 52.6, z: -16.9, r: 3.9 }; // yuqoriga chiqish rampasi
 const HELIX_DOWN = { x: 6, z: -16.9, r: 3.9 }; // pastga tushish rampasi (chiqish yo'liga yaqin)
 // Kamera: darvoza ko'rinishi va bo'sh paytdagi sayr nuqtalari [qaraladigan nuqta, kamera siljishi]
-const GATE_VIEW = [new THREE.Vector3(13, 2.6, -9.5), new THREE.Vector3(-19, 16, 27)];
+const GATE_VIEW = [new THREE.Vector3(15, 4, -16), new THREE.Vector3(0, 13, 42)]; // to'g'ridan: darvoza, garaj va ortida Humo Arena
+// 2-stoyanka: shahar x = 94 atrofida 180° buriladi — park yonidagi garaj darvoza joyiga keladi
+const MIRROR = new THREE.Matrix4().makeRotationY(Math.PI).setPosition(188, 0, 0);
 // Bo'sh payt: o'rtadan umumiy ko'rinish — garaj, mall, Humo Arena, park va ikkinchi garaj bir kadrda
 const OVERVIEW = [new THREE.Vector3(98, 0, 6), new THREE.Vector3(0, 104, 128)];
 const Y_AXIS = new THREE.Vector3(0, 1, 0);
@@ -523,7 +525,7 @@ function buildBooth(scene) {
   g.add(box(w + 0.66, 0.06, 0.06, mat(0x8d8f93, { metalness: 0.5 }), { y: 2.25, z: d / 2 + 0.33 }));
 }
 
-function buildWorld(scene) {
+function buildWorld(scene, gate) {
   // Asfalt, maysa, trotuarlar
   const ground = mesh(new THREE.PlaneGeometry(420, 280), new THREE.MeshStandardMaterial({ map: grassTex([84, 56]), roughness: 1 }), { x: 80, z: 0, shadow: false });
   ground.rotation.x = -Math.PI / 2;
@@ -535,8 +537,10 @@ function buildWorld(scene) {
   const yellow = mat(0xf2c230, { roughness: 0.7 });
   const curbMat = mat(0x8d8f93);
   const walk = (len) => new THREE.MeshStandardMaterial({ map: tileTex([len / 2, 1.1]), roughness: 0.85 });
-  scene.add(box(260, 0.16, 0.3, curbMat, { x: 80, y: 0.08, z: ROAD_EDGE + 0.15 }));
-  scene.add(box(260, 0.12, 2.2, walk(260), { x: 80, y: 0.06, z: ROAD_EDGE + 1.4 }));
+  for (const [x0, x1] of [[-50, 176.9], [180.4, 210]]) {
+    scene.add(box(x1 - x0, 0.16, 0.3, curbMat, { x: (x0 + x1) / 2, y: 0.08, z: ROAD_EDGE + 0.15 }));
+    scene.add(box(x1 - x0, 0.12, 2.2, walk(x1 - x0), { x: (x0 + x1) / 2, y: 0.06, z: ROAD_EDGE + 1.4 }));
+  }
   // -z tomonda trotuar maydon kirish yo'li (x 7,6..11) da uziladi
   for (const [x0, x1] of [[-50, 7.6], [11, 210]]) {
     scene.add(box(x1 - x0, 0.16, 0.3, curbMat, { x: (x0 + x1) / 2, y: 0.08, z: -ROAD_EDGE - 0.15 }));
@@ -546,28 +550,28 @@ function buildWorld(scene) {
   for (const z of [-(ISLAND + 0.15), ISLAND + 0.15, -(ROAD_EDGE - 0.2), ROAD_EDGE - 0.2]) {
     for (let x = -49; x < 209; x += 2) scene.add(box(1.1, 0.01, 0.1, white, { x, y: 0.022, z, shadow: false }));
   }
-  scene.add(box(0.3, 0.01, ROAD_EDGE - ISLAND, white, { x: -1.2, y: 0.023, z: -(ROAD_EDGE + ISLAND) / 2, shadow: false }));
-  scene.add(box(0.3, 0.01, ROAD_EDGE - ISLAND, white, { x: 1.2, y: 0.023, z: (ROAD_EDGE + ISLAND) / 2, shadow: false }));
+  gate.add(box(0.3, 0.01, ROAD_EDGE - ISLAND, white, { x: -1.2, y: 0.023, z: -(ROAD_EDGE + ISLAND) / 2, shadow: false }));
+  gate.add(box(0.3, 0.01, ROAD_EDGE - ISLAND, white, { x: 1.2, y: 0.023, z: (ROAD_EDGE + ISLAND) / 2, shadow: false }));
   // Yo'ldagi yozuvlar va o'qlar
   const inTex = textTexture('KIRISH  →', { font: 'bold 84px Arial' });
   const outTex = textTexture('←  CHIQISH', { font: 'bold 84px Arial' });
-  scene.add(decal(inTex, 3.6, 0.9, -7, LANE_IN, 0));
-  scene.add(decal(outTex, 3.6, 0.9, 7, LANE_OUT, 0));
+  gate.add(decal(inTex, 3.6, 0.9, -7, LANE_IN, 0));
+  gate.add(decal(outTex, 3.6, 0.9, 7, LANE_OUT, 0));
   // Orolcha: bordyurli, ichida maysa, uchlari sariq-qora
-  scene.add(box(13, 0.16, ISLAND * 2, mat(0x9a9c9f), { x: 0.5, y: 0.08 }));
-  scene.add(box(12.4, 0.17, ISLAND * 2 - 0.4, new THREE.MeshStandardMaterial({ map: tileTex([6, 1.3]), roughness: 0.85 }), { x: 0.5, y: 0.085 }));
-  for (const end of [-6, 7]) for (let i = 0; i < 6; i++) scene.add(box(0.2, 0.17, 0.5, i % 2 ? yellow : mat(0x15171a), { x: end, y: 0.09, z: -1.25 + i * 0.5 }));
+  gate.add(box(13, 0.16, ISLAND * 2, mat(0x9a9c9f), { x: 0.5, y: 0.08 }));
+  gate.add(box(12.4, 0.17, ISLAND * 2 - 0.4, new THREE.MeshStandardMaterial({ map: tileTex([6, 1.3]), roughness: 0.85 }), { x: 0.5, y: 0.085 }));
+  for (const end of [-6, 7]) for (let i = 0; i < 6; i++) gate.add(box(0.2, 0.17, 0.5, i % 2 ? yellow : mat(0x15171a), { x: end, y: 0.09, z: -1.25 + i * 0.5 }));
   // Daraxtlar qatori (trotuar ortida) va butalar
   let seed = 1;
   for (const z of [-ROAD_EDGE - 3.4, ROAD_EDGE + 3.4]) {
     for (let x = -20; x <= 208; x += 4.2) {
       if (z < 0 && (Math.abs(x - 0.5) < 2 || x > 5)) continue; // budka ro'parasi va to'xtash maydoni ochiq
-      if (z > 0 && x > 128) continue; // ikkinchi garaj oldi
+      if (z > 0 && (x > 128 || (x > -10 && x < 30))) continue; // ikkinchi garaj oldi va darvoza kamerasi oldi ochiq
       scene.add(buildTree(x + Math.sin(seed) * 0.6, z + Math.cos(seed) * 0.4, 0.95 + (seed % 3) * 0.12, seed++));
     }
     for (let x = -19; x <= 127; x += 2.1) if ((z > 0 && Math.abs(x - 84) > 3.5) || x < 6) scene.add(buildBush(x, z > 0 ? z - 1.2 : z + 1.2, 0.8 + (seed % 2) * 0.2, seed++));
   }
-  for (const x of [-5.2, 6.2]) scene.add(buildBush(x, 0, 1, seed++)); // orolchadagi gulzor
+  for (const x of [-5.2, 6.2]) gate.add(buildBush(x, 0, 1, seed++)); // orolchadagi gulzor
   // Ko'cha chiroqlari ikki tomonda
   for (const x of [-12, -4, 4]) buildLamp(scene, x, -ROAD_EDGE - 0.6, 1);
   for (const x of [6, 14, 26, 40, 54, 68, 100, 116]) buildLamp(scene, x, ROAD_EDGE + 0.6, -1); // old tomonda — kamerani to'smaydigan joylarda
@@ -582,13 +586,13 @@ function buildWorld(scene) {
   for (let i = 0; i < 36; i++) {
     const h = 12 + ((i * 37) % 7) * 3;
     const bw = 6 + (i % 3) * 2;
-    const bld = mesh(new THREE.BoxGeometry(bw, h, 6), new THREE.MeshStandardMaterial({ map: facadeTex(0.25), roughness: 0.8 }), { x: -50 + i * 7.6, y: h / 2, z: -78 - (i % 2) * 5, shadow: false });
+    const bld = mesh(new THREE.BoxGeometry(bw, h, 6), new THREE.MeshStandardMaterial({ map: facadeTex(0.25), roughness: 0.8 }), { x: -50 + i * 7.6, y: h / 2, z: -96 - (i % 2) * 6, shadow: false });
     scene.add(bld);
   }
   // "P" belgisi kirishda
   const pTex = textTexture('P', { w: 128, h: 128, bg: '#2257d6', font: 'bold 96px Arial' });
-  scene.add(box(0.08, 2.8, 0.08, mat(0x8a8f96), { x: -4.2, y: 1.4, z: -ROAD_EDGE - 0.6 }));
-  scene.add(mesh(new THREE.PlaneGeometry(0.9, 0.9), new THREE.MeshStandardMaterial({ map: pTex }), { x: -4.2, y: 2.85, z: -ROAD_EDGE - 0.55 }));
+  gate.add(box(0.08, 2.8, 0.08, mat(0x8a8f96), { x: -4.2, y: 1.4, z: -ROAD_EDGE - 0.6 }));
+  gate.add(mesh(new THREE.PlaneGeometry(0.9, 0.9), new THREE.MeshStandardMaterial({ map: pTex }), { x: -4.2, y: 2.85, z: -ROAD_EDGE - 0.55 }));
 
   // Nogironlar belgisi: "nogironlar uchun bepul" (kirishda, yo'l chetida)
   {
@@ -620,24 +624,24 @@ function buildWorld(scene) {
     g.fillText('BEPUL', 128, 270);
     const tex = new THREE.CanvasTexture(c);
     tex.colorSpace = THREE.SRGBColorSpace;
-    scene.add(box(0.08, 2.4, 0.08, mat(0x8a8f96), { x: -6.2, y: 1.2, z: -ROAD_EDGE - 0.6 }));
+    gate.add(box(0.08, 2.4, 0.08, mat(0x8a8f96), { x: -6.2, y: 1.2, z: -ROAD_EDGE - 0.6 }));
     const board = mesh(new THREE.PlaneGeometry(0.8, 1.0), new THREE.MeshStandardMaterial({ map: tex, emissive: 0xffffff, emissiveMap: tex, emissiveIntensity: 0.25 }), { x: -6.2, y: 2.25, z: -ROAD_EDGE - 0.55 });
-    scene.add(board);
+    gate.add(board);
     // Yo'l yuzasidagi bo'yalgan belgi (kirish yo'lagida)
-    scene.add(decal(tex, 1.1, 1.38, -10, LANE_IN, Math.PI / 2));
+    gate.add(decal(tex, 1.1, 1.38, -10, LANE_IN, Math.PI / 2));
   }
 
   // Raqam kameralari (past ustun, mashinaga qaragan)
   for (const [p, face] of [[CAM_IN, -1], [CAM_OUT, 1]]) {
-    scene.add(box(0.07, p.y, 0.07, mat(0x6f7378), { x: p.x, y: p.y / 2 + 0.15, z: p.z }));
+    gate.add(box(0.07, p.y, 0.07, mat(0x6f7378), { x: p.x, y: p.y / 2 + 0.15, z: p.z }));
     const cam = box(0.28, 0.12, 0.12, mat(0xe9eaec), { x: p.x, y: p.y + 0.2, z: p.z });
     cam.rotation.y = face < 0 ? -0.45 : Math.PI - 0.45;
     cam.add(box(0.03, 0.07, 0.07, mat(0x111111, { emissive: 0x223355, emissiveIntensity: 0.6 }), { x: -0.15 }));
-    scene.add(cam);
+    gate.add(cam);
   }
 
-  buildBooth(scene);
-  return [buildBarrier(scene, -1), buildBarrier(scene, 1)];
+  buildBooth(gate);
+  return [buildBarrier(gate, -1), buildBarrier(gate, 1)];
 }
 
 // ---------- Garaj binosi: beton plitalar, ustunlar, panjaralar, alyumin qanotlar, spiral rampa, tom bog'i ----------
@@ -1173,8 +1177,8 @@ function buildMall(scene) {
 
 // ---------- Humo Arena: elliptik muz saroyi — pastda shisha qavat, "Humo qushi patlari" kabi egilgan oq qanotlar, gumbazsimon tom, ko'k chiroq halqalari ----------
 function buildArena(scene) {
-  const AX = 152;
-  const AZ = -36;
+  const AX = 29;
+  const AZ = -60;
   const RX = 25;
   const RZ = 17;
   const g = new THREE.Group();
@@ -1223,9 +1227,9 @@ function buildArena(scene) {
   signTex.wrapS = signTex.wrapT = THREE.ClampToEdgeWrapping;
   g.add(mesh(new THREE.PlaneGeometry(24, 3.75), new THREE.MeshStandardMaterial({ map: signTex, transparent: true, emissive: 0xffffff, emissiveMap: signTex, emissiveIntensity: 0.9 }), { y: 20.4, z: RZ + 1.4, shadow: false }));
   // oldidagi maydon (yo'lgacha), daraxtlar
-  scene.add(mesh(new THREE.BoxGeometry(60, 0.06, 12), new THREE.MeshStandardMaterial({ map: tileTex([24, 5]), roughness: 0.85 }), { x: AX, y: 0.03, z: -11.6, shadow: false }));
+  scene.add(mesh(new THREE.BoxGeometry(56, 0.06, 15), new THREE.MeshStandardMaterial({ map: tileTex([22, 6]), roughness: 0.85 }), { x: AX, y: 0.03, z: -33.5, shadow: false }));
   let seed = 300;
-  for (const x of [124, 128, 176, 180]) for (const z of [-10, -15]) scene.add(buildTree(x, z, 1.1, seed++));
+  for (const x of [AX - 31, AX - 35]) for (const z of [-34, -46, -58]) scene.add(buildTree(x, z, 1.1, seed++));
   return (time) => {
     blue.emissiveIntensity = 1.3 + Math.sin(time * 1.4) * 0.35;
   };
@@ -1576,7 +1580,7 @@ function buildPark(scene) {
       const u = (time * 0.035 + 1 - i * 0.012) % 1;
       track.getPointAt(u, car.position);
       track.getPointAt((u + 0.003) % 1, p);
-      car.lookAt(p);
+      car.lookAt(scene.localToWorld(p));
     });
     jets.forEach((j, i) => { j.scale.y = i === 8 ? 3 + Math.sin(time * 2.2) * 0.8 : 1.4 + Math.max(0, Math.sin(time * 3 + i * 0.8)) * 1.6; });
     // arg'imchoq: 20 s aylanadi, 8 s to'xtaydi — sekin tezlashib, sekin to'xtaydi
@@ -1602,7 +1606,7 @@ function buildPark(scene) {
       const u = (((time * 0.012 - i * 0.026) % 1) + 1) % 1;
       trainPath.getPointAt(u, car.position);
       trainPath.getPointAt((u + 0.004) % 1, p);
-      car.lookAt(p);
+      car.lookAt(scene.localToWorld(p));
     });
     // qaroqchi kemasi: 24 s tebranadi (amplituda o'sib-kamayadi), 6 s tinch
     const ph = time % 30;
@@ -1645,7 +1649,7 @@ function buildWalkers(scene) {
 const GUARD_SEATED = { uniform: 0x2f4a3a, cap: 0x23362b, skin: 0xd9a77e, mustache: 0xd8d8d8, vest: false, girth: 1.15, brows: 0xbfbfbf };
 const GUARD_OUTSIDE = { uniform: 0x24448f, cap: 0x1b2a55, skin: 0xe8b98f, mustache: null, vest: true, girth: 1, brows: 0x3a2a20 };
 
-export default function Gate3D({ event, arrival, reject, release, spots, focusZone, onPlateRead }) {
+export default function Gate3D({ lot = 1, event, arrival, reject, release, spots, focusZone, onPlateRead }) {
   const mount = useRef(null);
   const bubble = useRef(null);
   const camBox = useRef(null);
@@ -1701,20 +1705,26 @@ export default function Gate3D({ event, arrival, reject, release, spots, focusZo
     sun.shadow.bias = -0.0004;
     scene.add(sun);
 
-    const barriers = buildWorld(scene);
+    // Shahar (yo'l, mall, park, arena, boshqa garaj) — alohida guruh; darvoza va shu stoyankaning garaji joyida
+    const city = new THREE.Group();
+    scene.add(city);
+    const barriers = buildWorld(city, scene);
     const garage = buildGarage(scene);
-    const mall = buildMall(scene);
-    const walkers = buildWalkers(scene);
-    const park = buildPark(scene);
-    const arena = buildArena(scene);
-    // Ikkinchi garaj (200 joy) — park yonida, yo'lning narigi tomonida, birinchisiga ko'zgudek qaragan
+    const mall = buildMall(city);
+    const walkers = buildWalkers(city);
+    const park = buildPark(city);
+    const arena = buildArena(city);
+    // Boshqa stoyankaning garaji (bezak): 1-stoyankada — park yonida, 2-stoyankada — mall yonida
     const garage2Root = new THREE.Group();
-    garage2Root.position.x = 188;
-    garage2Root.rotation.y = Math.PI;
-    scene.add(garage2Root);
+    if (lot !== 2) {
+      garage2Root.position.x = 188;
+      garage2Root.rotation.y = Math.PI;
+    }
+    city.add(garage2Root);
     const garage2 = buildGarage(garage2Root);
     garage2Root.traverse((o) => o.isLight && (o.visible = false)); // ichki chiroqlar uzoqdan ko'rinmaydi, faqat sahnani sekinlashtiradi
     fillGarage(garage2);
+    if (lot === 2) city.applyMatrix4(MIRROR);
 
     // To'xtab turgan mashinalar (yengil model) — serverdagi band joylar bilan bir xil
     const parked = parkedRef.current;
@@ -2008,7 +2018,7 @@ export default function Gate3D({ event, arrival, reject, release, spots, focusZo
       renderer.setScissorTest(false);
       renderer.render(scene, camera);
 
-      // Raqam kamerasi: mashina old raqamini kuzatadi (yuqori o'ng burchak)
+      // Raqam kamerasi: mashina old raqamini kuzatadi (chap pastki burchak)
       const cb = camBox.current;
       const camState = states.in?.cam ? states.in : states.out?.cam ? states.out : null;
       if (camState && cars[camState.lane].visible) {
@@ -2020,13 +2030,13 @@ export default function Gate3D({ event, arrival, reject, release, spots, focusZo
         // 2,6 m oldinda, biroz yon tomonda va tepada — haqiqiy raqam kamerasi burchagi
         plateCam.position.set(front + dir * 2.6, car.userData.plateY + 0.28, car.position.z + (dir > 0 ? 0.55 : -0.55));
         plateCam.lookAt(look);
-        const iw = Math.round(w * 0.46);
+        const iw = Math.round(Math.max(150, w * 0.27));
         const ih = Math.round(iw * 0.62);
         plateCam.aspect = iw / ih;
         plateCam.updateProjectionMatrix();
         renderer.setScissorTest(true);
-        renderer.setScissor(w - iw - 8, h - ih - 8, iw, ih);
-        renderer.setViewport(w - iw - 8, h - ih - 8, iw, ih);
+        renderer.setScissor(8, 8, iw, ih);
+        renderer.setViewport(8, 8, iw, ih);
         renderer.render(scene, plateCam);
         renderer.setScissorTest(false);
         if (cb) {

@@ -2,7 +2,7 @@
 // oldinda oltin hoshiyali karta. Login yozilganda o'sha xodimning 3D personaji chiqadi.
 // "Kirish" bosilganda tugma ichida mashina kirib keladi; muvaffaqiyatda personaj sakrab xursand bo'ladi.
 import { lazy, Suspense, useEffect, useMemo, useState } from 'react';
-import { api, API } from './api';
+import { api, API, setToken } from './api';
 import { characterFor } from './characters';
 import Icon from './Icon';
 
@@ -71,7 +71,7 @@ export default function Login({ onLogin, online: bootOnline }) {
     try {
       const { token, user } = await api('/login', { method: 'POST', body: form });
       await wait(Math.max(0, 1100 - (performance.now() - started))); // mashina tugma ichiga kirib ulgursin
-      localStorage.setItem('token', token);
+      setToken(token);
       setRole(user.role);
       setPhase('done');
       await wait(1700); // personaj sakrab xursand bo'ladi

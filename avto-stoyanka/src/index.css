@@ -213,7 +213,7 @@ label { display: grid; gap: .3rem; font-size: .9rem; color: var(--paint-dim); }
 .gate { position: relative; height: 270px; border-radius: 10px; overflow: hidden; background: var(--asphalt); }
 .gate-canvas { position: absolute; inset: 0; }
 .gate-caption {
-  position: absolute; left: 10px; bottom: 10px; display: flex; align-items: center; gap: .5rem;
+  position: absolute; right: 10px; bottom: 10px; display: flex; align-items: center; gap: .5rem;
   font: 600 1rem var(--display); background: rgba(33, 35, 40, .85); padding: .3rem .6rem; border-radius: 6px;
   animation: caption 3.8s ease forwards;
 }
@@ -498,7 +498,7 @@ label { display: grid; gap: .3rem; font-size: .9rem; color: var(--paint-dim); }
 .say.angry { color: #c2141b; font-size: 1.15rem; letter-spacing: .05em; animation: shake .12s linear infinite; }
 @keyframes shake { 50% { margin-left: 2px; margin-top: -1px; } }
 .cam-box {
-  position: absolute; right: 8px; top: 8px; z-index: 2; pointer-events: none; opacity: 0;
+  position: absolute; left: 8px; bottom: 8px; z-index: 2; pointer-events: none; opacity: 0;
   border: 2px solid rgba(255, 255, 255, .7); border-radius: 4px; transition: opacity .25s; font: 600 .68rem ui-monospace, Consolas, monospace;
 }
 .cam-box.on { opacity: 1; }
@@ -821,3 +821,8 @@ label { display: grid; gap: .3rem; font-size: .9rem; color: var(--paint-dim); }
 .vip-perks tr { display: flex; align-items: center; gap: 8px; padding: 4px 0; border-bottom: 1px solid rgba(242, 194, 48, .15); }
 .vip-perks td { padding: 0; font-size: .88rem; }
 .vip-perks td:first-child { color: var(--yellow); display: grid; place-items: center; }
+
+/* Stoyanka: qorovulda belgi, adminda almashtirgich */
+.counter.lot-tag { background: #3a3f47; }
+.lot-switch { align-self: center; }
+.lot-switch button { white-space: nowrap; }

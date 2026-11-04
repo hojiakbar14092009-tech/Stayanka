@@ -1,6 +1,6 @@
 // Ilova qobig'i: kirish, tepa panel, bo'limlar, real vaqt xabarlari (SSE)
 import { useCallback, useEffect, useState } from 'react';
-import { api, API, getToken, money } from './api';
+import { api, API, getToken, clearToken, setActiveLot, money } from './api';
 import GuardPanel from './GuardPanel';
 import Archive from './Archive';
 import { Overview, SpotsAdmin, TariffAdmin, UsersAdmin } from './Admin';
@@ -21,8 +21,14 @@ export default function App() {
   const [tariff, setTariff] = useState(null);
   const [lastEvent, setLastEvent] = useState(null);
   const [toasts, setToasts] = useState([]);
+  const [lot, setLot] = useState(1); // qorovul — o'z stoyankasi; admin almashtiradi
+  const chooseLot = (n) => {
+    setActiveLot(n);
+    setLot(n);
+  };
 
   const signIn = (u) => {
+    chooseLot(u.lot || 1);
     setUser(u);
     setTab(u.role === 'admin' ? 'overview' : 'lot');
   };
@@ -61,6 +67,7 @@ export default function App() {
     es.onmessage = (m) => {
       const ev = JSON.parse(m.data);
       reload().catch(() => {});
+      if (ev.lot && ev.lot !== lot) return; // boshqa stoyankaning voqeasi
       if (ev.type === 'enter') {
         setLastEvent(ev);
         notify(`${ev.plate} → ${ev.label}${ev.is_premium ? ' (Premium)' : ''}${ev.disabled_driver ? ' ♿ bepul' : ''}${ev.debt ? `. Qarzi bor: ${money(ev.debt)}` : ''}`, ev.debt ? 'expel' : 'enter');
@@ -75,7 +82,7 @@ export default function App() {
       }
     };
     return () => es.close();
-  }, [user, reload, notify]);
+  }, [user, lot, reload, notify]);
 
   if (!boot) return <Boot onReady={ready} />;
   if (!user) return <Login onLogin={signIn} online={boot.online} />;
@@ -84,7 +91,7 @@ export default function App() {
   const taken = spots.filter((s) => s.is_busy).length;
 
   function logout() {
-    localStorage.removeItem('token');
+    clearToken();
     setUser(null);
   }
 
@@ -99,6 +106,13 @@ export default function App() {
           <span className="counter free"><b>{free}</b> bo'sh</span>
           <span className="counter busy"><b>{taken}</b> band</span>
           <span className="counter cash"><small>Bugun</small><b>{money(revenue.total)}</b></span>
+          {user.role === 'admin' ? (
+            <span className="seg lot-switch" role="group" aria-label="Stoyanka">
+              {[1, 2].map((n) => <button key={n} type="button" className={lot === n ? 'on' : ''} onClick={() => chooseLot(n)}>{n}-stoyanka</button>)}
+            </span>
+          ) : (
+            <span className="counter lot-tag"><b>{lot}</b><small>-stoyanka</small></span>
+          )}
         </div>
         <div className="who">
           <span>{user.full_name}</span>
@@ -112,9 +126,9 @@ export default function App() {
       </header>
 
       <main className="content">
-        {tab === 'lot' && <GuardPanel spots={spots} tariff={tariff} reload={reload} lastEvent={lastEvent} notify={notify} />}
-        {tab === 'archive' && <Archive />}
-        {tab === 'overview' && <Overview spots={spots} lastEvent={lastEvent} />}
+        {tab === 'lot' && <GuardPanel key={lot} lot={lot} spots={spots} tariff={tariff} reload={reload} lastEvent={lastEvent} notify={notify} />}
+        {tab === 'archive' && <Archive key={lot} />}
+        {tab === 'overview' && <Overview key={lot} spots={spots} lastEvent={lastEvent} />}
         {tab === 'spots' && <SpotsAdmin spots={spots} reload={reload} />}
         {tab === 'tariff' && <TariffAdmin key={JSON.stringify(tariff)} tariff={tariff} reload={reload} />}
         {tab === 'users' && <UsersAdmin me={user} />}

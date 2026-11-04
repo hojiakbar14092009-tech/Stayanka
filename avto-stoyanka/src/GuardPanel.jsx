@@ -322,7 +322,7 @@ function MiniMap({ list, foundIds }) {
 
 let lastAuto = Date.now() - 115000; // birinchi avtomatik qadam panel ochilgandan ~5 soniyadan keyin
 
-export default function GuardPanel({ spots, tariff, reload, lastEvent, notify }) {
+export default function GuardPanel({ lot, spots, tariff, reload, lastEvent, notify }) {
   const [zone, setZone] = useState('B');
   const [selectedId, setSelectedId] = useState(null);
   const [plate, setPlate] = useState('');
@@ -581,7 +581,7 @@ export default function GuardPanel({ spots, tariff, reload, lastEvent, notify })
         </form>
 
         <Suspense fallback={<div className="gate" />}>
-          <Gate3D event={lastEvent} arrival={arrival} reject={reject} release={release} spots={view} focusZone={zone} onPlateRead={plateRead} />
+          <Gate3D lot={lot} event={lastEvent} arrival={arrival} reject={reject} release={release} spots={view} focusZone={zone} onPlateRead={plateRead} />
         </Suspense>
         <button className="btn ghost sm cam-demo" onClick={() => setArrival({ plate: randomPlate(), at: Date.now() })}>
           <Icon name="camera" /> Kamera oldiga mashina keldi (sinov)

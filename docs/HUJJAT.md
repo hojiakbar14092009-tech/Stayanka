@@ -260,11 +260,22 @@ Vercel'dagi sayt shu kompyuterdagi serverga ulanganda Chrome "mahalliy tarmoqqa 
 
 - **Mall** 2.3 baravar kattalashdi (eni ~60 m), g'arbiy devori garaj rampasiga tegib turadi. Garajdan mallga ikki yo'l:
   2-qavat tomidan shisha ko'prik va yer sathida yopiq shisha soyabonli piyodalar yo'lagi («Tashkent City Mall →»).
-- **Humo Arena** — mallning sharqida, yo'lning shu tomonida: elliptik bino, pastda shisha foye, ko'k chiroq halqalari,
+- **Humo Arena** — 1-garajning ortida, darvoza kamerasining qoq ro'parasida: elliptik bino, pastda shisha foye, ko'k chiroq halqalari,
   egilgan oq qanotlar (Humo qushi patlari), gumbazsimon oq tom, «HUMO ARENA» yozuvi, oldida maydon va zinapoyalar.
 - **Park** janubga kengaydi (z 9..75): zanjirli arg'imchoq (aylanib-to'xtaydi), choynak karusel, urilma mashinalar,
   ko'l va oqqush qayiqlar, ko'l atrofida bolalar poyezdi, qaroqchi kemasi; xiyobonlarda 8 kishi sayr qiladi, tartibsiz daraxtzor.
 - **Ikkinchi garaj (200 joy)** — park yonida, yo'lning narigi tomonida, birinchisiga ko'zgudek; joylarning ~60% band (bezak),
   sensorlar va LED tablo shunga mos. Kirish yo'li va «P 200» belgisi.
-- **Kamera:** voqea bo'lsa — darvoza; 12 soniya tinch bo'lsa — o'rtadan umumiy ko'rinish, hamma binolar bir kadrda.
+- **Kamera:** voqea bo'lsa — darvozaga to'g'ridan (yo'lga tik), ortida garaj va Humo Arena; raqam kamerasi — kichik oyna, chap pastki burchakda; 12 soniya tinch bo'lsa — o'rtadan umumiy ko'rinish, hamma binolar bir kadrda.
 - **Avtomatik oqim:** qorovul panelida har 2 daqiqada bitta chiqish (QR skaner) va bitta kirish (chek bilan).
+
+## 19. Ikki stoyanka, ikki qorovul
+
+- **1-stoyanka** — mall yonidagi garaj, **2-stoyanka** — park yonidagi garaj; har biri 200 joy (`spots.lot`).
+  Eski bazada 2-stoyanka joylari server ishga tushganda o'zi qo'shiladi (1-sining nusxasi), ma'lumot o'chmaydi.
+- Har qorovul bitta stoyankaga biriktiriladi (`users.lot`): Aziz va Dilshod — 1, Bekzod — 2. Admin «Qorovullar»da almashtiradi.
+- Qorovul sahifasi faqat o'z stoyankasini ko'rsatadi: joylar ro'yxati, tushum, cheklar, real vaqt xabarlari, 3D darvoza.
+  2-stoyanka sahifasida 3D shahar ko'zgudek aylanadi — park yonidagi garaj faol, mall yonidagisi bezak.
+- Boshqa stoyankaning chekini skanerlasa: «Bu chek 2-stoyankaniki». Mashina bir vaqtda ikki stoyankada bo'lolmaydi.
+- Admin tepa paneldagi «1-stoyanka / 2-stoyanka» tugmasi bilan almashtiradi.
+- Bir brauzerda ikki qorovul: token har tabda alohida (sessionStorage) — har tab o'z qorovulida qoladi.

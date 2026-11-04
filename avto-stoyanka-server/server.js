@@ -48,7 +48,7 @@ app.post('/api/login', async (req, res) => {
   const { rows } = await pool.query('SELECT * FROM users WHERE username = $1 AND active', [String(username || '').trim()]);
   const user = rows[0];
   if (!user || !checkPassword(String(password || ''), user.password_hash)) throw fail(401, "Login yoki parol noto'g'ri");
-  res.json({ token: makeToken(user), user: { id: user.id, username: user.username, full_name: user.full_name, role: user.role } });
+  res.json({ token: makeToken(user), user: { id: user.id, username: user.username, full_name: user.full_name, role: user.role, lot: user.lot } });
 });
 
 // Token: Authorization: Bearer ... yoki ?token=... (EventSource sarlavha yubora olmaydi)
@@ -56,11 +56,13 @@ async function auth(req, res, next) {
   const raw = (req.headers.authorization || '').replace(/^Bearer /, '') || req.query.token;
   const payload = readToken(raw);
   if (!payload) return next(fail(401, 'Qaytadan kiring'));
-  const { rows } = await pool.query('SELECT id, username, full_name, role FROM users WHERE id = $1 AND active', [payload.id]);
+  const { rows } = await pool.query('SELECT id, username, full_name, role, lot FROM users WHERE id = $1 AND active', [payload.id]);
   if (!rows[0]) return next(fail(401, 'Profil faol emas'));
   req.user = rows[0];
   next();
 }
+// Qaysi stoyanka: qorovul — o'ziga biriktirilgani; admin — ?lot= (berilmasa null = ikkalasi)
+const lotOf = (req) => (req.user.role === 'guard' ? req.user.lot || 1 : [1, 2].includes(Number(req.query.lot)) ? Number(req.query.lot) : null);
 const adminOnly = (req, res, next) => next(req.user.role === 'admin' ? undefined : fail(403, 'Faqat admin uchun'));
 
 // Holat tekshiruvi (yuklanish ekrani va oflayn rejim uchun) — tokensiz
@@ -88,7 +90,8 @@ app.get('/api/spots', async (req, res) => {
     FROM spots s
     LEFT JOIN sessions se ON se.spot_id = s.id AND se.left_at IS NULL
     LEFT JOIN users u ON u.id = se.guard_in
-    ORDER BY s.id`);
+    WHERE s.lot = $1
+    ORDER BY s.id`, [lotOf(req) || 1]);
   res.json(rows);
 });
 
@@ -104,22 +107,23 @@ async function enterCar(req, res) {
   const premium = req.body?.premium === true;
   // Nogironlik guvohnomasi: to'xtash bepul, avval nogironlar joyiga qo'yiladi
   const disabledDriver = req.body?.disabled_driver === true;
+  const lot = lotOf(req) || 1;
   const db = await pool.connect();
   try {
     await db.query('BEGIN');
     const dup = await db.query(
-      'SELECT s.label FROM sessions se JOIN spots s ON s.id = se.spot_id WHERE se.plate = $1 AND se.left_at IS NULL', [plate]);
-    if (dup.rows[0]) throw fail(409, `${plate} allaqachon ${dup.rows[0].label} joyida turibdi`);
+      'SELECT s.label, s.lot FROM sessions se JOIN spots s ON s.id = se.spot_id WHERE se.plate = $1 AND se.left_at IS NULL', [plate]);
+    if (dup.rows[0]) throw fail(409, `${plate} allaqachon ${dup.rows[0].lot}-stoyanka ${dup.rows[0].label} joyida turibdi`);
 
     // Nogironlar joyiga faqat guvohnomasi borlar qo'yiladi
     const spot = spotId
       ? await db.query(
-          'UPDATE spots SET is_busy = true WHERE id = $1 AND NOT is_busy AND NOT is_disabled AND (NOT is_accessible OR $2) RETURNING *', [spotId, disabledDriver])
+          'UPDATE spots SET is_busy = true WHERE id = $1 AND lot = $3 AND NOT is_busy AND NOT is_disabled AND (NOT is_accessible OR $2) RETURNING *', [spotId, disabledDriver, lot])
       : await db.query(`
           UPDATE spots SET is_busy = true WHERE id = (
-            SELECT id FROM spots WHERE NOT is_busy AND NOT is_disabled AND is_premium = $1 AND ($2 OR NOT is_accessible)
+            SELECT id FROM spots WHERE lot = $3 AND NOT is_busy AND NOT is_disabled AND is_premium = $1 AND ($2 OR NOT is_accessible)
             ORDER BY ($2 AND is_accessible) DESC, id LIMIT 1 FOR UPDATE SKIP LOCKED)
-          RETURNING *`, [premium, disabledDriver]);
+          RETURNING *`, [premium, disabledDriver, lot]);
     if (!spot.rows[0]) {
       throw fail(409, spotId ? 'Bu joy band, yopiq yoki nogironlar uchun ajratilgan' : premium ? "Bo'sh VIP joy qolmadi" : "Bo'sh oddiy joy qolmadi");
     }
@@ -135,7 +139,7 @@ async function enterCar(req, res) {
     await db.query('UPDATE sessions SET ticket_no = $2 WHERE id = $1', [id, ticketNo]);
     await db.query('COMMIT');
     const debtSum = debt.rows[0].sum;
-    broadcast({ type: 'enter', plate, label: s.label, is_premium: s.is_premium, disabled_driver: disabledDriver, guard: req.user.full_name, debt: debtSum });
+    broadcast({ type: 'enter', lot, plate, label: s.label, is_premium: s.is_premium, disabled_driver: disabledDriver, guard: req.user.full_name, debt: debtSum });
     const ticket = {
       ticket_no: ticketNo, plate, label: s.label, spot_id: s.id, is_premium: s.is_premium, disabled_driver: disabledDriver, debt: debtSum,
       entered_at, active: true, guard_in_name: req.user.full_name, tariff: await getTariff(db),
@@ -160,9 +164,9 @@ async function closeSession(req, res, paid) {
   try {
     await db.query('BEGIN');
     const open = await db.query(`
-      SELECT se.*, s.label, s.is_premium, now() AS now
+      SELECT se.*, s.label, s.is_premium, s.lot, now() AS now
       FROM sessions se JOIN spots s ON s.id = se.spot_id
-      WHERE se.spot_id = $1 AND se.left_at IS NULL FOR UPDATE OF se`, [req.params.spot_id]);
+      WHERE se.spot_id = $1 AND se.left_at IS NULL AND ($2::int IS NULL OR s.lot = $2) FOR UPDATE OF se`, [req.params.spot_id, lotOf(req)]);
     const se = open.rows[0];
     if (!se) throw fail(404, "Bu joyda mashina yo'q");
 
@@ -180,7 +184,7 @@ async function closeSession(req, res, paid) {
       entered_at: se.entered_at, left_at: se.now, fee, paid, guard_out_name: req.user.full_name,
       hours: Math.max(1, Math.ceil((se.now - se.entered_at) / 3600000)), tariff,
     };
-    broadcast({ type: paid ? 'exit' : 'expel', plate: se.plate, label: se.label, fee, guard: req.user.full_name });
+    broadcast({ type: paid ? 'exit' : 'expel', lot: se.lot, plate: se.plate, label: se.label, fee, guard: req.user.full_name });
     res.json(receipt);
   } catch (e) {
     await db.query('ROLLBACK');
@@ -193,8 +197,9 @@ async function closeSession(req, res, paid) {
 // ---------- 4. GET /api/revenue — bugungi tushum ----------
 app.get('/api/revenue', async (req, res) => {
   const { rows } = await pool.query(`
-    SELECT COALESCE(SUM(fee), 0)::int AS total, count(*)::int AS count
-    FROM sessions WHERE left_at >= date_trunc('day', now()) AND paid`);
+    SELECT COALESCE(SUM(se.fee), 0)::int AS total, count(*)::int AS count
+    FROM sessions se JOIN spots s ON s.id = se.spot_id
+    WHERE se.left_at >= date_trunc('day', now()) AND se.paid AND ($1::int IS NULL OR s.lot = $1)`, [lotOf(req)]);
   res.json(rows[0]);
 });
 
@@ -204,12 +209,14 @@ app.get('/api/tickets/:code', async (req, res) => {
   const code = String(req.params.code).toUpperCase().replace(/[\s-]/g, '');
   const { rows } = await pool.query(`
     SELECT se.id, se.ticket_no, se.receipt_no, se.plate, se.entered_at, se.left_at, se.fee, se.paid, se.disabled_driver, se.spot_id,
-           s.label, s.zone, s.is_premium, se.left_at IS NULL AS active, gi.full_name AS guard_in_name
+           s.label, s.zone, s.is_premium, s.lot, se.left_at IS NULL AS active, gi.full_name AS guard_in_name
     FROM sessions se JOIN spots s ON s.id = se.spot_id
     LEFT JOIN users gi ON gi.id = se.guard_in
     WHERE replace(se.ticket_no, '-', '') = $1 OR se.plate = $1
     ORDER BY (replace(se.ticket_no, '-', '') = $1) DESC, se.left_at IS NULL DESC, se.entered_at DESC LIMIT 1`, [code]);
   if (!rows[0]) throw fail(404, "Bunday chek topilmadi");
+  const lot = lotOf(req);
+  if (lot && rows[0].active && rows[0].lot !== lot) throw fail(409, `Bu chek ${rows[0].lot}-stoyankaniki: mashina o'sha darvozadan chiqadi`);
   res.json({ ...rows[0], tariff: await getTariff() });
 });
 
@@ -218,7 +225,7 @@ app.get('/api/receipts', async (req, res) => {
   const { q = '', from = null, to = null } = req.query;
   const { rows } = await pool.query(`
     SELECT se.id, se.receipt_no, se.ticket_no, se.plate, se.entered_at, se.left_at, se.fee, se.paid, se.disabled_driver,
-           s.label, s.is_premium, gi.full_name AS guard_in_name, go.full_name AS guard_out_name
+           s.label, s.is_premium, s.lot, gi.full_name AS guard_in_name, go.full_name AS guard_out_name
     FROM sessions se
     JOIN spots s ON s.id = se.spot_id
     LEFT JOIN users gi ON gi.id = se.guard_in
@@ -228,7 +235,8 @@ app.get('/api/receipts', async (req, res) => {
            OR replace(se.ticket_no, '-', '') ILIKE '%' || $1 || '%')
       AND ($2::date IS NULL OR se.left_at >= $2::date)
       AND ($3::date IS NULL OR se.left_at < $3::date + 1)
-    ORDER BY se.left_at DESC LIMIT 300`, [String(q).trim().replace(/[\s-]/g, ''), from || null, to || null]);
+      AND ($4::int IS NULL OR s.lot = $4)
+    ORDER BY se.left_at DESC LIMIT 300`, [String(q).trim().replace(/[\s-]/g, ''), from || null, to || null, lotOf(req)]);
   res.json(rows);
 });
 
@@ -242,14 +250,14 @@ app.get('/api/admin/stats', async (req, res) => {
       SELECT zone, count(*)::int AS total,
              count(*) FILTER (WHERE is_busy)::int AS busy,
              count(*) FILTER (WHERE is_disabled)::int AS disabled
-      FROM spots GROUP BY zone ORDER BY zone`),
+      FROM spots WHERE ($1::int IS NULL OR lot = $1) GROUP BY zone ORDER BY zone`, [lotOf(req)]),
     pool.query(`
       SELECT to_char(d, 'YYYY-MM-DD') AS day, COALESCE(SUM(se.fee), 0)::int AS total, count(se.id)::int AS count
       FROM generate_series(date_trunc('day', now()) - interval '6 days', date_trunc('day', now()), interval '1 day') d
       LEFT JOIN sessions se ON se.left_at >= d AND se.left_at < d + interval '1 day' AND se.paid
       GROUP BY d ORDER BY d`),
     pool.query(`
-      SELECT u.id, u.full_name, count(se.id)::int AS exits, COALESCE(SUM(se.fee), 0)::int AS total
+      SELECT u.id, u.full_name, u.lot, count(se.id)::int AS exits, COALESCE(SUM(se.fee), 0)::int AS total
       FROM users u
       LEFT JOIN sessions se ON se.guard_out = u.id AND se.left_at >= date_trunc('day', now()) AND se.paid
       WHERE u.role = 'guard' GROUP BY u.id ORDER BY total DESC`),
@@ -287,20 +295,21 @@ app.put('/api/admin/settings', async (req, res) => {
 
 // Qorovullar
 app.get('/api/admin/users', async (req, res) => {
-  const { rows } = await pool.query('SELECT id, username, full_name, role, active FROM users ORDER BY id');
+  const { rows } = await pool.query('SELECT id, username, full_name, role, active, lot FROM users ORDER BY id');
   res.json(rows);
 });
 
 app.post('/api/admin/users', async (req, res) => {
-  const { username, password, full_name, role = 'guard' } = req.body || {};
+  const { username, password, full_name, role = 'guard', lot = 1 } = req.body || {};
+  if (![1, 2].includes(Number(lot))) throw fail(400, "Stoyanka 1 yoki 2 bo'lsin");
   if (!/^[a-z0-9_]{3,20}$/.test(username || '')) throw fail(400, 'Login: 3–20 ta kichik lotin harf yoki raqam');
   if (String(password || '').length < 6) throw fail(400, "Parol kamida 6 belgi bo'lsin");
   if (!String(full_name || '').trim()) throw fail(400, 'Ism kiriting');
   if (!['admin', 'guard'].includes(role)) throw fail(400, "Rol noto'g'ri");
   try {
     const { rows } = await pool.query(
-      'INSERT INTO users (username, password_hash, full_name, role) VALUES ($1, $2, $3, $4) RETURNING id, username, full_name, role, active',
-      [username, hashPassword(password), full_name.trim(), role]);
+      'INSERT INTO users (username, password_hash, full_name, role, lot) VALUES ($1, $2, $3, $4, $5) RETURNING id, username, full_name, role, active, lot',
+      [username, hashPassword(password), full_name.trim(), role, role === 'guard' ? Number(lot) : null]);
     res.status(201).json(rows[0]);
   } catch (e) {
     if (e.code === '23505') throw fail(409, 'Bu login band');
@@ -309,14 +318,15 @@ app.post('/api/admin/users', async (req, res) => {
 });
 
 app.put('/api/admin/users/:id', async (req, res) => {
-  const { full_name = null, password = null, active = null } = req.body || {};
+  const { full_name = null, password = null, active = null, lot = null } = req.body || {};
+  if (lot !== null && ![1, 2].includes(Number(lot))) throw fail(400, "Stoyanka 1 yoki 2 bo'lsin");
   if (Number(req.params.id) === req.user.id && active === false) throw fail(400, "O'zingizni o'chira olmaysiz");
   if (password !== null && String(password).length < 6) throw fail(400, "Parol kamida 6 belgi bo'lsin");
   const { rows } = await pool.query(`
     UPDATE users SET full_name = COALESCE($2, full_name), password_hash = COALESCE($3, password_hash),
-                     active = COALESCE($4, active)
-    WHERE id = $1 RETURNING id, username, full_name, role, active`,
-    [req.params.id, full_name?.trim() || null, password ? hashPassword(password) : null, active]);
+                     active = COALESCE($4, active), lot = COALESCE($5, lot)
+    WHERE id = $1 RETURNING id, username, full_name, role, active, lot`,
+    [req.params.id, full_name?.trim() || null, password ? hashPassword(password) : null, active, lot === null ? null : Number(lot)]);
   if (!rows[0]) throw fail(404, 'Profil topilmadi');
   res.json(rows[0]);
 });
@@ -353,6 +363,13 @@ await pool.query(`
   ALTER TABLE sessions ADD COLUMN IF NOT EXISTS paid BOOLEAN NOT NULL DEFAULT true;
   ALTER TABLE sessions ADD COLUMN IF NOT EXISTS disabled_driver BOOLEAN NOT NULL DEFAULT false;
   ALTER TABLE spots ADD COLUMN IF NOT EXISTS is_accessible BOOLEAN NOT NULL DEFAULT false;
+  ALTER TABLE spots ADD COLUMN IF NOT EXISTS lot SMALLINT NOT NULL DEFAULT 1;
+  ALTER TABLE spots DROP CONSTRAINT IF EXISTS spots_label_key;
+  CREATE UNIQUE INDEX IF NOT EXISTS spots_lot_label ON spots(lot, label);
+  INSERT INTO spots (label, zone, is_premium, is_accessible, lot)
+    SELECT label, zone, is_premium, is_accessible, 2 FROM spots WHERE lot = 1 AND NOT EXISTS (SELECT 1 FROM spots WHERE lot = 2) ORDER BY id;
+  ALTER TABLE users ADD COLUMN IF NOT EXISTS lot SMALLINT;
+  UPDATE users SET lot = CASE WHEN username = 'bekzod' THEN 2 ELSE 1 END WHERE role = 'guard' AND lot IS NULL;
   INSERT INTO settings VALUES ('premium_hour', 30000) ON CONFLICT (key) DO NOTHING;
   DELETE FROM settings WHERE key = 'premium_mult';`).then(() => migrateBoss(pool)).catch((e) => {
   console.error(`Baza tayyor emas (${e.message}). Avval: npm run init-db`);

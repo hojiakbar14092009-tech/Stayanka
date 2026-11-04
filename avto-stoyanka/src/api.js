@@ -1,17 +1,34 @@
 // Server bilan aloqa va umumiy yordamchilar
 export const API = import.meta.env.VITE_API || 'http://localhost:3000/api';
 
-export const getToken = () => localStorage.getItem('token');
+// Token har tabda alohida (sessionStorage): bitta brauzerda ikki qorovul ikki tabda ishlay oladi; yangi tab oxirgi kirishni oladi
+export const getToken = () => {
+  const t = sessionStorage.getItem('token') || localStorage.getItem('token');
+  if (t) sessionStorage.setItem('token', t); // tab o'z tokeniga mahkamlanadi: boshqa tabdagi kirish unga ta'sir qilmaydi
+  return t;
+};
+export const setToken = (t) => {
+  sessionStorage.setItem('token', t);
+  localStorage.setItem('token', t);
+};
+export const clearToken = () => {
+  sessionStorage.removeItem('token');
+  localStorage.removeItem('token');
+};
+
+// Admin qaysi stoyankani ko'ryapti — har so'rovga ?lot= qo'shiladi (qorovulniki serverda belgilangan)
+let activeLot = 1;
+export const setActiveLot = (n) => { activeLot = n; };
 
 export async function api(path, { method = 'GET', body } = {}) {
-  const res = await fetch(API + path, {
+  const res = await fetch(`${API}${path}${path.includes('?') ? '&' : '?'}lot=${activeLot}`, {
     method,
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${getToken()}` },
     body: body ? JSON.stringify(body) : undefined,
   });
   const data = await res.json().catch(() => ({}));
   if (res.status === 401 && path !== '/login') {
-    localStorage.removeItem('token');
+    clearToken();
     window.dispatchEvent(new Event('logout'));
   }
   if (!res.ok) throw new Error(data.error || "Server bilan aloqa yo'q");
