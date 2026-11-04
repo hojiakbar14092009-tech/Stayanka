@@ -145,6 +145,14 @@ async function enterCar(req, res) {
     await db.query('COMMIT');
     const debtSum = debt.rows[0].sum;
     broadcast({ type: 'enter', lot, plate, label: s.label, is_premium: s.is_premium, disabled_driver: disabledDriver, guard: req.user.full_name, debt: debtSum });
+    // Kirish kamerasi raqamni qidiruvdagi ro'yxat bilan solishtiradi: bor bo'lsa — o'g'irlangan deb yoziladi, hammaga xabar
+    const wanted = await db.query('SELECT note FROM wanted WHERE plate = $1', [plate]);
+    if (wanted.rows[0]) {
+      const f = await db.query(
+        "INSERT INTO stolen_found (plate, spot_label, session_id, inspector) VALUES ($1, $2, $3, 'Kirish kamerasi') ON CONFLICT (session_id) DO NOTHING RETURNING id",
+        [plate, s.label, id]);
+      if (f.rows[0]) broadcast({ type: 'stolen', plate, label: s.label, inspector: 'Kirish kamerasi', note: wanted.rows[0].note });
+    }
     const ticket = {
       ticket_no: ticketNo, plate, label: s.label, spot_id: s.id, is_premium: s.is_premium, disabled_driver: disabledDriver, debt: debtSum,
       entered_at, active: true, guard_in_name: req.user.full_name, tariff: await getTariff(db),
@@ -251,31 +259,14 @@ app.get('/api/receipts', async (req, res) => {
   res.json(rows);
 });
 
-// ---------- Xavfsizlik: qidiruvdagi (o'g'irlangan) raqamlar, smenadagi tekshiruvchilar, topilganlar ----------
+// ---------- Xavfsizlik: qidiruvdagi (o'g'irlangan) raqamlar va kirish kamerasi aniqlaganlar ----------
 app.get('/api/security', async (req, res) => {
-  const [wanted, found, inspectors] = await Promise.all([
+  const [wanted, found] = await Promise.all([
     pool.query('SELECT plate, note, added_at FROM wanted ORDER BY added_at DESC'),
     pool.query(`SELECT f.id, f.plate, f.spot_label, f.inspector, f.found_at, se.left_at IS NULL AS open
       FROM stolen_found f LEFT JOIN sessions se ON se.id = f.session_id ORDER BY f.found_at DESC LIMIT 200`),
-    pool.query("SELECT id, full_name, on_shift FROM staff WHERE role = 'inspector' AND active ORDER BY id"),
   ]);
-  res.json({ wanted: wanted.rows, found: found.rows, inspectors: inspectors.rows });
-});
-
-// Tekshiruvchi stoyankadagi mashina qidiruvda ekanini aniqladi — bir tashrif uchun bir marta yoziladi, hammaga xabar
-app.post('/api/stolen', async (req, res) => {
-  const plate = normPlate(req.body?.plate);
-  const inspector = String(req.body?.inspector || '').trim().slice(0, 60) || 'Tekshiruvchi';
-  const w = await pool.query('SELECT note FROM wanted WHERE plate = $1', [plate]);
-  if (!w.rows[0]) throw fail(404, 'Bu raqam qidiruvda emas');
-  const se = (await pool.query(
-    'SELECT se.id, s.label FROM sessions se JOIN spots s ON s.id = se.spot_id WHERE se.plate = $1 AND se.left_at IS NULL', [plate])).rows[0];
-  if (!se) throw fail(404, 'Bu mashina stoyankada emas');
-  const { rows } = await pool.query(
-    'INSERT INTO stolen_found (plate, spot_label, session_id, inspector) VALUES ($1, $2, $3, $4) ON CONFLICT (session_id) DO NOTHING RETURNING *',
-    [plate, se.label, se.id, inspector]);
-  if (rows[0]) broadcast({ type: 'stolen', plate, label: se.label, inspector, note: w.rows[0].note, at_found: rows[0].found_at });
-  res.status(rows[0] ? 201 : 200).json(rows[0] || { duplicate: true });
+  res.json({ wanted: wanted.rows, found: found.rows, inspectors: [] }); // inspectors: [] — eski panel nusxalari buzilmasin
 });
 
 // ---------- Admin ----------
@@ -394,29 +385,6 @@ app.delete('/api/admin/wanted/:plate', async (req, res) => {
   await pool.query('DELETE FROM wanted WHERE plate = $1', [normPlate(req.params.plate)]);
   broadcast({ type: 'security' });
   res.json({ deleted: true });
-});
-
-// Tekshiruvchilar: yangi ishchi qo'shish va smenaga qo'yish (bir smenada ko'pi bilan 2 ta)
-const INSPECTOR_WAGE = 180000;
-app.post('/api/admin/inspectors', async (req, res) => {
-  const name = String(req.body?.full_name || '').trim();
-  if (name.length < 3) throw fail(400, 'Ism va familiyani kiriting');
-  const { rows } = await pool.query(
-    "INSERT INTO staff (full_name, role, daily_wage) VALUES ($1, 'inspector', $2) RETURNING id, full_name, on_shift", [name.slice(0, 60), INSPECTOR_WAGE]);
-  broadcast({ type: 'security' });
-  res.status(201).json(rows[0]);
-});
-app.put('/api/admin/inspectors/:id', async (req, res) => {
-  const onShift = req.body?.on_shift === true;
-  if (onShift) {
-    const { rows } = await pool.query("SELECT count(*)::int AS n FROM staff WHERE role = 'inspector' AND active AND on_shift AND id <> $1", [req.params.id]);
-    if (rows[0].n >= 2) throw fail(409, 'Smenada allaqachon 2 ta tekshiruvchi bor. Avval birini smenadan chiqaring');
-  }
-  const { rows } = await pool.query(
-    "UPDATE staff SET on_shift = $2 WHERE id = $1 AND role = 'inspector' RETURNING id, full_name, on_shift", [req.params.id, onShift]);
-  if (!rows[0]) throw fail(404, 'Tekshiruvchi topilmadi');
-  broadcast({ type: 'security' });
-  res.json(rows[0]);
 });
 
 // Cheklari bor profil o'chmaydi (arxiv saqlanadi) — faqat nofaol qilinadi

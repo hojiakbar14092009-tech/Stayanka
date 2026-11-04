@@ -339,3 +339,11 @@ Vercel'dagi sayt shu kompyuterdagi serverga ulanganda Chrome "mahalliy tarmoqqa 
 - **Mini-xarita:** bo'sh joy — chiziqli bo'sh katak, band — yonib turgan qizil, nogironlar — ko'k chiziq (yashil yo'q).
 - **Ranglar (yangilandi):** band joy — muz-moviy (`--occupied`, joy sensori chirog'i kabi): mini-xarita, rejadagi joy, tablodagi «band».
   Qizil faqat o'g'irlangan mashina uchun: zona mini-xaritasida qizil katak urib turadi (1,1 s), zona kartasi qizil hoshiyada.
+
+## 25. Tekshiruvchilar olib tashlandi
+
+- 3D dagi tekshiruvchilar, «Tekshiruvchilar» kartasi, rejadagi ism belgisi va admindagi tekshiruvchi boshqaruvi olib tashlandi;
+  eski tekshiruvchi yozuvlari ish haqidan chiqarildi (`staff.active = false`).
+- O'g'irlangan mashinani endi **kirish kamerasi** aniqlaydi: mashina kiritilganda raqami qidiruvdagi ro'yxatda bo'lsa —
+  `stolen_found` ga «Kirish kamerasi» deb yoziladi, hammaga qizil ogohlantirish, zonada qizil katak. Chiqarish taqiqi va
+  «Militsiyaga topshirildi» o'zgarmagan.

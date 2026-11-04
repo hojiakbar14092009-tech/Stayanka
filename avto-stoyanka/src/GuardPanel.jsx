@@ -1,5 +1,5 @@
 // Qorovul paneli: tepadan ko'rilgan stoyanka rejasi + o'ng tomonda qidiruv, darvoza (kamera), skaner va amal kartasi
-import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react';
 import { api, money, time, duration, calcFee, paintFor, brandFor, washerWow, shapeFor, VIP_PERKS } from './api';
 import Icon from './Icon';
 import Receipt from './Receipt';
@@ -52,7 +52,7 @@ function Car({ plate, premium, leaving, onDone }) {
 }
 
 // Joy. Mashina yo'lakdan burilib kiradi; chiqqanda orqaga yurib, yo'lak bo'ylab ketadi (lane: r = o'ngga, l = chapga).
-function Stall({ spot, face, lane, selected, found, checker, stolen, onPick }) {
+function Stall({ spot, face, lane, selected, found, stolen, onPick }) {
   const state = spot.is_disabled ? 'off' : spot.is_busy ? 'busy' : 'free';
   const title = spot.is_disabled ? "ta'mirda" : !spot.is_busy && spot.is_accessible ? "bo'sh, nogironlar uchun" : spot.is_busy ? `band, ${spot.plate}, ${brandFor(spot.plate, spot.is_premium)}` : "bo'sh";
   // Chiqib ketayotgan mashinani animatsiya tugaguncha ko'rsatamiz
@@ -77,7 +77,6 @@ function Stall({ spot, face, lane, selected, found, checker, stolen, onPick }) {
       {leaving && <Car key="out" plate={leaving} premium={spot.is_premium} leaving onDone={() => setLeaving(null)} />}
       {spot.is_busy && <span className="stall-plate">{spot.plate}</span>}
       {found && <span className="pin" aria-hidden="true"><Icon name="pin" size="1.6em" /></span>}
-      {checker && <span className="checker"><Icon name="search" size="1em" /> {checker}</span>}
       {stolen && <span className="stolen-tag">o'g'irlangan</span>}
     </button>
   );
@@ -299,7 +298,7 @@ function Washer({ lot, dirtyIds, crew, index, claims, plates }) {
 }
 
 // Zona: 4 qator × 10 joy. Ikki qator orasida yo'lak, o'rtada bordyur. Premium zona — yopiq tom ostida.
-function LotMap({ spots, selectedId, foundIds, checking, stolenPlates, onPick }) {
+function LotMap({ spots, selectedId, foundIds, stolenPlates, onPick }) {
   const lot = useRef(null);
   const claims = useMemo(() => new Map(), []); // qaysi mashinani qaysi moykachi yuvyapti
   const premium = spots[0]?.is_premium;
@@ -310,7 +309,7 @@ function LotMap({ spots, selectedId, foundIds, checking, stolenPlates, onPick })
   const row = (list, face, lane) => (
     <div className="stall-row">
       {list.map((s) => (
-        <Stall key={s.id} spot={s} face={face} lane={lane} selected={s.id === selectedId} found={foundIds.has(s.id)} checker={checking.get(s.label)} stolen={s.is_busy && stolenPlates.has(s.plate)} onPick={onPick} />
+        <Stall key={s.id} spot={s} face={face} lane={lane} selected={s.id === selectedId} found={foundIds.has(s.id)} stolen={s.is_busy && stolenPlates.has(s.plate)} onPick={onPick} />
       ))}
     </div>
   );
@@ -391,14 +390,8 @@ export default function GuardPanel({ security, spots, tariff, reload, lastEvent,
   const autoOut = useRef(false); // ochiq skaner/chiqish cheki avtomatik oqimniki
   const autoIn = useRef(false); // darvozadagi mashina avtomatik oqimniki
   const live = useRef({});
-  const [inspecting, setInspecting] = useState([]); // 3D dagi tekshiruvchilar holati
-  const checking = useMemo(() => new Map(inspecting.filter((c) => c.label).map((c) => [c.label, c.name])), [inspecting]);
   const stolenPlates = useMemo(() => new Set(security.found.filter((f) => f.open).map((f) => f.plate)), [security.found]); // hali ichkarida turganlari
   const wantedPlates = useMemo(() => security.wanted.map((w) => w.plate), [security.wanted]);
-  const shiftNames = useMemo(() => security.inspectors.filter((i) => i.on_shift).map((i) => i.full_name).slice(0, 2), [security.inspectors]);
-  const reportStolen = useCallback((plate, label, inspector) => {
-    api('/stolen', { method: 'POST', body: { plate, inspector } }).catch(() => {}); // takror yoki mashina chiqib ketgan — e'tiborsiz
-  }, []);
   const now = useNow();
 
   const selected = spots.find((s) => s.id === selectedId);
@@ -479,7 +472,7 @@ export default function GuardPanel({ security, spots, tariff, reload, lastEvent,
         }
       } else {
         autoIn.current = true;
-        // ba'zan (taxminan 25 mashinadan biri) qidiruvdagi mashina keladi — tekshiruvchilar uni topishi kerak
+        // ba'zan (taxminan 25 mashinadan biri) qidiruvdagi mashina keladi — kirish kamerasi uni aniqlaydi
         const inside = new Set(view.map((x) => x.plate));
         const wantedOut = live.current.wantedPlates.filter((p) => !inside.has(p));
         setArrival({ plate: wantedOut.length && Math.random() < 0.04 ? wantedOut[Math.floor(Math.random() * wantedOut.length)] : randomPlate(), at: t });
@@ -606,7 +599,7 @@ export default function GuardPanel({ security, spots, tariff, reload, lastEvent,
             );
           })}
         </nav>
-        <LotMap spots={zoneSpots} selectedId={selectedId} foundIds={foundIds} checking={checking} stolenPlates={stolenPlates} onPick={pick} />
+        <LotMap spots={zoneSpots} selectedId={selectedId} foundIds={foundIds} stolenPlates={stolenPlates} onPick={pick} />
         <p className="legend">
           <span className="key free" /> bo'sh <span className="key busy" /> band <span className="key off" /> ta'mirda <Icon name="crown" /> VIP, yopiq <AccessSign small /> nogironlar uchun, bepul
         </p>
@@ -646,25 +639,11 @@ export default function GuardPanel({ security, spots, tariff, reload, lastEvent,
         </form>
 
         <Suspense fallback={<div className="gate" />}>
-          <Gate3D inspectors={shiftNames} wanted={wantedPlates} onStolen={reportStolen} onInspect={setInspecting} event={lastEvent} arrival={arrival} reject={reject} release={release} spots={view} focusZone={zone} onPlateRead={plateRead} />
+          <Gate3D event={lastEvent} arrival={arrival} reject={reject} release={release} spots={view} focusZone={zone} onPlateRead={plateRead} />
         </Suspense>
         <button className="btn ghost sm cam-demo" onClick={() => setArrival({ plate: randomPlate(), at: Date.now() })}>
           <Icon name="camera" /> Kamera oldiga mashina keldi (sinov)
         </button>
-        <div className="card inspectors-live">
-          <h3><Icon name="search" /> Tekshiruvchilar</h3>
-          {inspecting.length ? (
-            <ul>
-              {inspecting.map((c) => (
-                <li key={c.name}>
-                  <b>{c.name}</b>
-                  <span>{c.label ? (c.phase === 'check' ? c.label + ' ni tekshirmoqda' : c.label + ' tomon ketmoqda') : 'aylanib yuribdi'}</span>
-                  <small className="muted">{c.level + 1}-qavat</small>
-                </li>
-              ))}
-            </ul>
-          ) : <p className="muted small">Smenada tekshiruvchi yo'q. Admin «Xavfsizlik» bo'limida smenaga qo'yadi.</p>}
-        </div>
         <button className={`btn ghost sm cam-demo${auto ? ' on' : ''}`} onClick={() => setAuto((v) => !v)} aria-pressed={auto}>
           {auto ? "Avtomatik oqim: har daqiqada 3 kirish; 85% to'lsa birma-bir chiqadi" : "Avtomatik oqim: o'chirilgan"}
         </button>

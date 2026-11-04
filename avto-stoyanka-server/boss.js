@@ -3,8 +3,7 @@
 import crypto from 'node:crypto';
 
 const DAYS = { day: 1, week: 7, month: 30 };
-const WAGE = { guard: 200000, washer: 150000, inspector: 180000 }; // kunlik ish haqi, so'm
-const INSPECTORS = [['Sherzod Aliyev', true], ["Ulug'bek Nazarov", true], ['Farrux Qodirov', false]]; // 2 tasi smenada
+const WAGE = { guard: 200000, washer: 150000 }; // kunlik ish haqi, so'm
 // Namuna uchun qidiruvdagi raqamlar (IIV xabari) — admin o'zgartiradi
 const WANTED = [['01A777BC', "IIV qidiruvida, 02.11 da o'g'irlangan"], ['40K321MN', "Sug'urta: o'g'irlik"], ['85H555XY', 'IIV qidiruvida'], ['10S909AA', "Egasi arizasi bo'yicha"], ['75E123TT', 'IIV qidiruvida']];
 const WASHERS = ['Sardor', 'Jasur', 'Otabek'];
@@ -51,17 +50,11 @@ export async function migrateBoss(pool) {
       await pool.query("INSERT INTO staff (full_name, role, daily_wage, pay_period) VALUES ($1, 'washer', $2, $3)", [name, WAGE.washer, ['day', 'week', 'month'][i]]);
     }
   }
-  // Tekshiruvchilar (o'g'irlangan mashinalarni qidiradi) — rol, smena belgisi va boshlang'ich ishchilar
+  // Tekshiruvchilar olib tashlangan (o'g'irlanganni kirish kamerasi aniqlaydi): eski yozuvlar ish haqidan chiqariladi
   await pool.query(`
-    ALTER TABLE staff ADD COLUMN IF NOT EXISTS on_shift BOOLEAN NOT NULL DEFAULT false;
     ALTER TABLE staff DROP CONSTRAINT IF EXISTS staff_role_check;
-    ALTER TABLE staff ADD CONSTRAINT staff_role_check CHECK (role IN ('guard', 'washer', 'inspector'));`);
-  const ins = await pool.query("SELECT count(*)::int AS n FROM staff WHERE role = 'inspector'");
-  if (!ins.rows[0].n) {
-    for (const [name, onShift] of INSPECTORS) {
-      await pool.query("INSERT INTO staff (full_name, role, daily_wage, on_shift) VALUES ($1, 'inspector', $2, $3)", [name, WAGE.inspector, onShift]);
-    }
-  }
+    ALTER TABLE staff ADD CONSTRAINT staff_role_check CHECK (role IN ('guard', 'washer', 'inspector'));
+    UPDATE staff SET active = false WHERE role = 'inspector';`);
   const wn = await pool.query("INSERT INTO kv VALUES ('wanted_seeded', '1') ON CONFLICT (key) DO NOTHING RETURNING key");
   if (wn.rows[0]) for (const [plate, note] of WANTED) await pool.query('INSERT INTO wanted (plate, note) VALUES ($1, $2) ON CONFLICT DO NOTHING', [plate, note]);
   const ex = await pool.query('SELECT count(*)::int AS n FROM expenses');

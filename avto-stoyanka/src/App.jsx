@@ -77,7 +77,7 @@ export default function App() {
   const [tariff, setTariff] = useState(null);
   const [lastEvent, setLastEvent] = useState(null);
   const [toasts, setToasts] = useState([]);
-  const [security, setSecurity] = useState({ wanted: [], found: [], inspectors: [] });
+  const [security, setSecurity] = useState({ wanted: [], found: [] });
   const [stolenAlert, setStolenAlert] = useState(null); // tekshiruvchi o'g'irlangan mashinani topdi
   const [lot, setLot] = useState(1); // qorovul — o'z stoyankasi; admin almashtiradi
   const chooseLot = (n) => {
@@ -139,7 +139,7 @@ export default function App() {
         notify(`${ev.plate} to'lamadi va haydab chiqarildi. Qarz: ${money(ev.fee)}`, 'expel');
       } else if (ev.type === 'stolen') {
         setStolenAlert(ev);
-        notify(`O'g'irlangan mashina: ${ev.plate}, ${ev.label}. Topdi: ${ev.inspector}`, 'expel');
+        notify(`O'g'irlangan mashina: ${ev.plate}, ${ev.label}. Aniqladi: ${ev.inspector}`, 'expel');
       } else if (ev.type === 'tariff') {
         notify('Tarif yangilandi', 'info');
       }
@@ -201,7 +201,7 @@ export default function App() {
             <p className="plate xl">{stolenAlert.plate}</p>
             <dl className="facts">
               <dt>Joy</dt><dd>{stolenAlert.label}</dd>
-              <dt>Topdi</dt><dd>{stolenAlert.inspector}</dd>
+              <dt>Aniqladi</dt><dd>{stolenAlert.inspector}</dd>
               <dt>Qidiruv</dt><dd>{stolenAlert.note || '—'}</dd>
               <dt>Vaqt</dt><dd>{time(stolenAlert.at)}</dd>
             </dl>

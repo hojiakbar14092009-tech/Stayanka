@@ -1012,7 +1012,7 @@ function buildGarage(scene) {
 const GUARD_SEATED = { uniform: 0x2f4a3a, cap: 0x23362b, skin: 0xd9a77e, mustache: 0xd8d8d8, vest: false, girth: 1.15, brows: 0xbfbfbf };
 const GUARD_OUTSIDE = { uniform: 0x24448f, cap: 0x1b2a55, skin: 0xe8b98f, mustache: null, vest: true, girth: 1, brows: 0x3a2a20 };
 
-export default function Gate3D({ inspectors, wanted, onStolen, onInspect, event, arrival, reject, release, spots, focusZone, onPlateRead }) {
+export default function Gate3D({ event, arrival, reject, release, spots, focusZone, onPlateRead }) {
   const mount = useRef(null);
   const bubble = useRef(null);
   const camBox = useRef(null);
@@ -1026,11 +1026,6 @@ export default function Gate3D({ inspectors, wanted, onStolen, onInspect, event,
   useEffect(() => { onRead.current = onPlateRead; }, [onPlateRead]);
   // Garajdagi mashinalar — real bandlik: animIn — hali yo'lda (joyida ko'rsatilmaydi), pendingOut — chiqish navbatida (joyida turadi)
   const spotsRef = useRef(spots);
-  // Tekshiruvchilar: smenadagi ismlar, qidiruvdagi raqamlar va xabar berish — sahna ichida o'qiladi
-  const crewRef = useRef({ names: [], wanted: new Set(), onStolen: null, onInspect: null });
-  useEffect(() => {
-    crewRef.current = { names: inspectors || [], wanted: new Set(wanted || []), onStolen, onInspect };
-  }, [inspectors, wanted, onStolen, onInspect]);
   const syncReq = useRef(true);
   const animIn = useRef(new Set());
   const pendingOut = useRef(new Set());
@@ -1141,143 +1136,6 @@ export default function Gate3D({ inspectors, wanted, onStolen, onInspect, event,
     };
     let focus = null;
 
-    // ---------- Tekshiruvchilar: 1-chisi 1-qavatni (A, B), 2-chisi 2–3-qavatlarni (C, D, E) aylanadi ----------
-    // Har mashina orqasiga borib 3,5 soniya raqamini tekshiradi; qidiruvdagi raqam bo'lsa — xabar beradi
-    const INSPECTOR_LOOK = { uniform: 0xff7a1a, cap: 0x1b1d21, mustache: null, vest: true, girth: 1, brows: 0x2a1d14 };
-    const crew = [0, 1].map((i) => {
-      const p = buildGuard({ ...INSPECTOR_LOOK, skin: i ? 0xe8b98f : 0xc98f62 });
-      p.scale.setScalar(0.95);
-      p.visible = false;
-      scene.add(p);
-      const c = document.createElement('canvas');
-      c.width = 512;
-      c.height = 128;
-      const tex = new THREE.CanvasTexture(c);
-      tex.colorSpace = THREE.SRGBColorSpace;
-      const tag = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, depthTest: false, transparent: true }));
-      tag.scale.set(2.7, 0.68, 1);
-      tag.position.y = 2.5;
-      tag.renderOrder = 12;
-      p.add(tag);
-      const level = i === 0 ? 0 : 1;
-      return { i, p, c, tex, name: '', text: '', level, lane: G.lane1, pos: new THREE.Vector3(G.xL + 0.6, level * FLOOR_H, G.lane1), route: [], target: null, phase: 'walk', until: 0 };
-    });
-    const checkedAt = new Map(); // joy → oxirgi tekshirilgan vaqt
-    const reported = new Set(); // raqam|joy — bir tashrifda bir marta xabar
-    let crewStatus = '';
-    const stepV = new THREE.Vector3();
-    const carLook = new THREE.Vector3();
-    const drawTag = (m, text) => {
-      if (m.text === text) return;
-      m.text = text;
-      const g = m.c.getContext('2d');
-      g.clearRect(0, 0, 512, 128);
-      g.fillStyle = 'rgba(20,22,26,.88)';
-      g.beginPath();
-      g.roundRect(4, 4, 504, 120, 24);
-      g.fill();
-      g.strokeStyle = '#ff7a1a';
-      g.lineWidth = 5;
-      g.stroke();
-      g.textAlign = 'center';
-      g.fillStyle = '#fff';
-      g.font = 'bold 48px Arial';
-      g.fillText(m.name, 256, 56);
-      g.fillStyle = '#ffb21e';
-      g.font = '34px Arial';
-      g.fillText(text, 256, 102);
-      m.tex.needsUpdate = true;
-    };
-    // Yo'l: hozirgi yo'lak → g'arbiy o'tish yo'lagi → (kerak bo'lsa zinapoya bilan boshqa qavat) → joy oldidagi yo'lak
-    const XS = G.xL + 0.6;
-    const planRoute = (m, st) => {
-      const pts = [];
-      let level = m.level;
-      if (st.level !== level || st.laneZ !== m.lane) {
-        pts.push({ v: new THREE.Vector3(XS, level * FLOOR_H, m.lane) });
-        if (st.level !== level) {
-          pts.push({ v: new THREE.Vector3(XS, level * FLOOR_H, -16.9), stairs: st.level });
-          level = st.level;
-        }
-        pts.push({ v: new THREE.Vector3(XS, level * FLOOR_H, st.laneZ) });
-      }
-      pts.push({ v: new THREE.Vector3(st.x, level * FLOOR_H, st.laneZ + st.toward * 0.3), lane: st.laneZ });
-      m.route = pts;
-      m.target = st;
-    };
-    const updateCrew = (time, dt) => {
-      const { names, wanted, onStolen, onInspect } = crewRef.current;
-      const status = [];
-      for (const m of crew) {
-        const name = names[m.i];
-        m.p.visible = !!name;
-        if (!name) continue;
-        if (m.name !== name) {
-          m.name = name;
-          m.text = '';
-        }
-        if (m.target && !parked.has(m.target.label)) { // mashina chiqib ketdi — boshqasiga
-          m.target = null;
-          m.route = [];
-        }
-        if (!m.target) {
-          const mine = [...parked.keys()].map(stallFor).filter((st) => st && (m.i === 0 ? st.level === 0 : st.level >= 1));
-          mine.sort((a, b) => (checkedAt.get(a.label) || 0) - (checkedAt.get(b.label) || 0));
-          if (mine[0]) planRoute(m, mine[0]);
-        }
-        const wp = m.route[0];
-        if (wp) {
-          stepV.subVectors(wp.v, m.pos).setY(0);
-          const dist = stepV.length();
-          if (dist < 0.06) {
-            m.route.shift();
-            if (wp.stairs !== undefined) { // zinapoya: boshqa qavatga chiqadi/tushadi
-              m.level = wp.stairs;
-              m.pos.y = wp.stairs * FLOOR_H;
-            }
-            if (wp.lane !== undefined) m.lane = wp.lane;
-            else if (Math.abs(wp.v.z - G.lane1) < 0.01 || Math.abs(wp.v.z - G.lane2) < 0.01) m.lane = wp.v.z;
-          } else {
-            stepV.multiplyScalar(Math.min(dist, 1.35 * dt) / dist);
-            m.pos.add(stepV);
-            m.p.rotation.y = Math.atan2(-stepV.z, stepV.x);
-          }
-          m.p.position.copy(m.pos);
-          poseGuard(m.p, 'walk', time, dt, null);
-          m.phase = 'walk';
-          drawTag(m, m.target ? m.target.label + ' sari' : 'aylanmoqda');
-        } else if (m.target) {
-          const st = m.target;
-          if (m.phase !== 'check') {
-            m.phase = 'check';
-            m.until = time + 3.5;
-          }
-          m.p.position.copy(m.pos);
-          poseGuard(m.p, 'idle', time, dt, carLook.set(st.x, st.y + 0.9, st.z));
-          drawTag(m, st.label + ' tekshirilmoqda');
-          if (time > m.until) {
-            checkedAt.set(st.label, time);
-            const plate = parked.get(st.label)?.plate;
-            if (plate && wanted.has(plate) && !reported.has(plate + st.label)) {
-              reported.add(plate + st.label);
-              onStolen?.(plate, st.label, m.name);
-            }
-            m.target = null;
-            m.phase = 'walk';
-          }
-        } else {
-          m.p.position.copy(m.pos);
-          poseGuard(m.p, 'idle', time, dt, null);
-          drawTag(m, 'kutmoqda');
-        }
-        status.push({ name: m.name, label: m.target?.label || null, phase: m.phase, level: m.level });
-      }
-      const key = JSON.stringify(status);
-      if (key !== crewStatus) {
-        crewStatus = key;
-        onInspect?.(status);
-      }
-    };
     let tourT = 0;
     const camOff = GATE_VIEW[1].clone();
     const offGoal = new THREE.Vector3();
@@ -1417,7 +1275,6 @@ export default function Gate3D({ inspectors, wanted, onStolen, onInspect, event,
       }
 
       for (const w of washers) if (w.visible) poseGuard(w, 'wave', time, dt, null);
-      updateCrew(time, dt);
       if (focusReq.current) {
         focus = { ...garage.showZone(focusReq.current), until: time + 7 };
         focusReq.current = null;
