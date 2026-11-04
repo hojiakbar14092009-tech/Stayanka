@@ -1,0 +1,15 @@
+# Render Blueprint: API server bulutda (noutbuk o'chiq bo'lsa ham ishlaydi)
+services:
+  - type: web
+    name: stayanka-api
+    runtime: node
+    plan: free
+    rootDir: avto-stoyanka-server
+    buildCommand: npm ci
+    startCommand: node server.js
+    healthCheckPath: /api/health
+    envVars:
+      - key: DATABASE_URL
+        sync: false # Neon'dagi ulanish satri (postgresql://...?sslmode=require)
+      - key: TOKEN_SECRET
+        generateValue: true

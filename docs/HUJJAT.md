@@ -236,3 +236,19 @@ Sinov uchun 30 kunlik tarix: `npm run demo` (server papkasida).
 
 - Savdo markazining ro'parasida, yo'lning narigi tomonida: kirish arkasi, xiyobonlar, 16 kabinali charxpalak (LED gardish rangi o'zgarib turadi), karusel, amerikan tepaligi (vagonchalar yuguradi), tushish minorasi va raqsga tushadigan favvora.
 - Darvozada voqea bo'lmasa, kamera 12 soniyadan keyin sekin aylana boshlaydi: darvoza → garaj va mall → park → qaytish. Mashina kelsa yoki zona tanlansa, darhol darvozaga/zonaga qaytadi. «Harakatni kamaytirish» yoqilgan bo'lsa aylanmaydi.
+
+## 17. Bulutda ishlatish (noutbuk o'chiq bo'lsa ham)
+
+Sayt (Vercel) serverni `VITE_API` manzilidan qidiradi; berilmasa — `localhost:3000`, ya'ni faqat shu kompyuterda ishlaydi.
+Doimiy ishlashi uchun server va baza bulutda turadi:
+
+1. **Baza — Neon** (bepul): neon.tech → yangi loyiha → ulanish satrini (`postgresql://...?sslmode=require`) nusxalash.
+2. **Server — Render** (bepul): render.com → New → Blueprint → shu GitHub repo. `render.yaml` o'qiladi,
+   `DATABASE_URL` so'raladi — Neon satrini qo'yish. Server birinchi ishga tushganda bo'sh bazada jadvallar,
+   200 joy va profillarni o'zi yaratadi (`seed.js`). Manzil: `https://stayanka-api.onrender.com`.
+3. **Sayt — Vercel**: Settings → Environment Variables → `VITE_API=https://stayanka-api.onrender.com/api` → Redeploy.
+4. Birinchi kirishdan keyin admin va qorovul parollarini almashtirish (boshlang'ich parollar repoda ochiq).
+
+Bepul Render 15 daqiqa so'rov bo'lmasa uxlaydi; birinchi so'rovda ~1 daqiqada uyg'onadi (kirish sahifasi shu vaqt
+"server javob bermayapti" deb qayta tekshirib turadi).
+Lokal PGlite bitta ulanishni ko'taradi: `.env` da `PG_POOL_MAX=1` (aks holda `ECONNRESET` → "Serverda xato").

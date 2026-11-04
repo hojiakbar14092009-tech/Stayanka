@@ -5,8 +5,12 @@ import cors from 'cors';
 import pg from 'pg';
 import { hashPassword, checkPassword, makeToken, readToken, calcFee } from './lib.js';
 import { migrateBoss, mountBoss, mountBossAdmin } from './boss.js';
+import { seed } from './seed.js';
 
-const pool = new pg.Pool({ connectionString: process.env.DATABASE_URL });
+const pool = new pg.Pool({
+  connectionString: process.env.DATABASE_URL,
+  max: Number(process.env.PG_POOL_MAX) || 10, // lokal PGlite bitta ulanishni ko'taradi: PG_POOL_MAX=1
+});
 const app = express();
 app.use(cors());
 app.use(express.json());
@@ -330,6 +334,13 @@ app.use((err, req, res, next) => {
   if (!err.status) console.error(err);
   res.status(err.status || 500).json({ error: err.status ? err.message : 'Serverda xato' });
 });
+
+// Bo'sh baza (yangi bulut bazasi): jadvallar va profillarni o'zi yaratadi
+const { rows: [fresh] } = await pool.query("SELECT to_regclass('public.users') IS NULL AS empty");
+if (fresh.empty) {
+  await seed(pool);
+  console.log("Bo'sh baza: jadvallar va profillar yaratildi");
+}
 
 // Eski bazani yangilash (ma'lumot o'chmaydi): yangi ustunlar va tarif kalitlari
 await pool.query(`
