@@ -17,11 +17,11 @@ const randomPlate = () =>
   pickL() + String(Math.floor(Math.random() * 900) + 100) + pickL() + pickL();
 const norm = (v) => v.toUpperCase().replace(/[\s-]/g, '');
 
-// Joriy vaqt — jonli narx va turgan vaqt uchun har 20 soniyada yangilanadi
+// Joriy vaqt — jonli narx va turgan vaqt uchun har 10 soniyada yangilanadi
 function useNow() {
   const [now, setNow] = useState(() => Date.now());
   useEffect(() => {
-    const t = setInterval(() => setNow(Date.now()), 20000);
+    const t = setInterval(() => setNow(Date.now()), 10000);
     return () => clearInterval(t);
   }, []);
   return now;
@@ -95,11 +95,47 @@ function AccessSign({ small }) {
   );
 }
 
-// Nogironlar joyini tanlash: guvohnomasi bo'lsa — avval nogironlar joyi, bo'lmasa oddiy joy; oddiy mashina nogironlar joyiga qo'yilmaydi
+// Joy tanlash: guvohnomasi bo'lsa — avval nogironlar joyi, bo'lmasa oddiy joy; oddiy mashina nogironlar joyiga qo'yilmaydi.
+// Joy tasodifiy (bir blokka to'planmaydi), lekin band joylar soni o'zgarmaguncha bir xil — ekrandagi "Keyingi joy" bilan kiritilgani mos.
 const pickFree = (list, prem, dd) => {
   const ok = (s) => !s.is_busy && !s.is_disabled && s.is_premium === prem;
-  return (dd && list.find((s) => ok(s) && s.is_accessible)) || list.find((s) => ok(s) && !s.is_accessible);
+  const acc = dd ? list.filter((s) => ok(s) && s.is_accessible) : [];
+  const pool = acc.length ? acc : list.filter((s) => ok(s) && !s.is_accessible);
+  if (!pool.length) return undefined;
+  const busy = list.filter((s) => s.is_busy).length;
+  return pool[(busy * 7919 + 13) % pool.length];
 };
+
+// Ichkaridagi mashinalar: kirgan vaqti, qancha turgani va hozirgi to'lov — vaqt o'tishi bilan o'zi qayta hisoblanadi
+function InsideList({ spots, now, tariff, onPick }) {
+  const inside = spots.filter((s) => s.is_busy && s.entered_at).sort((a, b) => new Date(b.entered_at) - new Date(a.entered_at));
+  return (
+    <div className="card inside">
+      <h2>Ichkaridagi mashinalar <span className="muted">{inside.length} ta</span></h2>
+      {inside.length ? (
+        <div className="inside-scroll">
+          <table className="table">
+            <thead><tr><th>Raqam</th><th>Joy</th><th>Kirdi</th><th>Turdi</th><th className="num">To'lov</th></tr></thead>
+            <tbody>
+              {inside.map((s) => {
+                const stay = now - new Date(s.entered_at);
+                return (
+                  <tr key={s.id}>
+                    <td><button type="button" className="link mono" onClick={() => onPick(s)}>{s.plate}</button></td>
+                    <td>{s.label}{s.is_premium ? ' (VIP)' : ''}</td>
+                    <td>{time(s.entered_at)}</td>
+                    <td>{duration(stay)}</td>
+                    <td className="num">{s.disabled_driver ? 'Bepul' : tariff ? money(calcFee(stay, tariff, s.is_premium)) : '…'}</td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      ) : <p className="muted">Hozir ichkarida mashina yo'q.</p>}
+    </div>
+  );
+}
 
 // Moykachilar jamoasi: har biri boshqa ko'rinishda, boshqa tezlikda, boshqa asbob bilan
 const CREW = [
@@ -320,9 +356,9 @@ function MiniMap({ list, foundIds }) {
   );
 }
 
-let lastAuto = Date.now() - 115000; // birinchi avtomatik qadam panel ochilgandan ~5 soniyadan keyin
+let lastAuto = Date.now() - 55000; // birinchi daqiqa panel ochilgandan ~5 soniyadan keyin boshlanadi
 
-export default function GuardPanel({ lot, spots, tariff, reload, lastEvent, notify }) {
+export default function GuardPanel({ spots, tariff, reload, lastEvent, notify }) {
   const [zone, setZone] = useState('B');
   const [selectedId, setSelectedId] = useState(null);
   const [plate, setPlate] = useState('');
@@ -343,7 +379,7 @@ export default function GuardPanel({ lot, spots, tariff, reload, lastEvent, noti
   const [arrivePremium, setArrivePremium] = useState(false);
   const [arriveDisabled, setArriveDisabled] = useState(false);
   const plateInput = useRef(null);
-  // Avtomatik oqim: har 2 daqiqada bitta mashina cheki skanerlanib chiqadi, bitta mashina kelib chek oladi — hammasi ekranda
+  // Avtomatik oqim: har daqiqada 1 mashina cheki skanerlanib chiqadi va 3 mashina kelib chek oladi — hammasi ekranda
   const [auto, setAuto] = useState(true);
   const autoOut = useRef(false); // ochiq skaner/chiqish cheki avtomatik oqimniki
   const autoIn = useRef(false); // darvozadagi mashina avtomatik oqimniki
@@ -380,7 +416,7 @@ export default function GuardPanel({ lot, spots, tariff, reload, lastEvent, noti
     const p = arrived.plate;
     setArrived({ plate: p, status: 'saving' });
     try {
-      const { spot, ticket: t } = await api('/enter', { method: 'POST', body: { plate: p, premium: arrivePremium, disabled_driver: arriveDisabled } });
+      const { spot, ticket: t } = await api('/enter', { method: 'POST', body: { plate: p, premium: arrivePremium, disabled_driver: arriveDisabled, spot_id: live.current.readyFree?.id } });
       setHidden((h) => new Set(h).add(spot.id));
       setSelectedId(null);
       setZone(spot.zone);
@@ -404,25 +440,32 @@ export default function GuardPanel({ lot, spots, tariff, reload, lastEvent, noti
 
   useEffect(() => {
     if (!auto) return;
-    const timers = [];
+    let plan = []; // shu daqiqaning qadamlari: [tur, qachondan]
     const tick = () => {
-      const { ticket, scanning, receipt, arrived, view } = live.current;
-      // Qorovul o'zi ishlayapti — keyinroq. Oxirgi qadam vaqti modulda: panel qayta ochilsa ham daqiqada bittadan oshmaydi
-      if (ticket || scanning || receipt || arrived || Date.now() - lastAuto < 120000) return;
-      lastAuto = Date.now();
-      const parked = view.filter((x) => x.is_busy && x.ticket_no);
-      const out = parked[Math.floor(Math.random() * parked.length)];
-      if (out) {
-        autoOut.current = true;
-        setScanning(out.ticket_no);
+      const t = Date.now();
+      if (!plan.length) {
+        // Daqiqa boshi vaqti modulda: panel qayta ochilsa ham daqiqasiga 1 chiqish + 3 kirishdan oshmaydi
+        if (t - lastAuto < 60000) return;
+        lastAuto = t;
+        plan = [['out', t], ['in', t + 12000], ['in', t + 28000], ['in', t + 44000]];
       }
-      timers.push(setTimeout(() => {
+      const { ticket, scanning, receipt, arrived, view } = live.current;
+      if (ticket || scanning || receipt || arrived || t < plan[0][1]) return; // qorovul o'zi ishlayapti yoki vaqti kelmadi — keyinroq
+      const [kind] = plan.shift();
+      if (kind === 'out') {
+        const parked = view.filter((x) => x.is_busy && x.ticket_no);
+        const out = parked[Math.floor(Math.random() * parked.length)];
+        if (out) {
+          autoOut.current = true;
+          setScanning(out.ticket_no);
+        }
+      } else {
         autoIn.current = true;
-        setArrival({ plate: randomPlate(), at: Date.now() });
-      }, out ? 15000 : 0));
+        setArrival({ plate: randomPlate(), at: t });
+      }
     };
-    const id = setInterval(tick, 5000);
-    return () => { clearInterval(id); timers.forEach(clearTimeout); };
+    const id = setInterval(tick, 1000);
+    return () => clearInterval(id);
   }, [auto]);
 
   // Avtomatik qadamlar: kamera o'qidi → chek chop etiladi → chek berildi, mashina kiradi
@@ -485,7 +528,7 @@ export default function GuardPanel({ lot, spots, tariff, reload, lastEvent, noti
     try {
       const { spot, ticket: t } = await api('/enter', {
         method: 'POST',
-        body: { plate, premium, disabled_driver: disabledDriver, spot_id: selected && !selected.is_busy ? selected.id : undefined },
+        body: { plate, premium, disabled_driver: disabledDriver, spot_id: selected && !selected.is_busy ? selected.id : nextFree?.id },
       });
       setPlate('');
       setPremium(false);
@@ -519,7 +562,7 @@ export default function GuardPanel({ lot, spots, tariff, reload, lastEvent, noti
 
   const view = hidden.size ? spots.map((s) => (hidden.has(s.id) ? { ...s, is_busy: false, plate: null, session_id: null } : s)) : spots;
   const zoneSpots = view.filter((s) => s.zone === zone);
-  const readyFree = pickFree(view, arrivePremium, arriveDisabled);
+  const readyFree = pickFree(spots, arrivePremium, arriveDisabled); // haqiqiy band joylar bo'yicha (darvozadagi mashinaning joyi ham band)
   live.current = { ticket, scanning, receipt, arrived, view, readyFree };
   const stayMs = selected?.entered_at ? now - new Date(selected.entered_at) : 0;
   const firstHour = (prem) => tariff && money(prem ? tariff.premium_hour : tariff.base_hour);
@@ -546,6 +589,7 @@ export default function GuardPanel({ lot, spots, tariff, reload, lastEvent, noti
         <p className="legend">
           <span className="key free" /> bo'sh <span className="key busy" /> band <span className="key off" /> ta'mirda <Icon name="crown" /> VIP, yopiq <AccessSign small /> nogironlar uchun, bepul
         </p>
+        <InsideList spots={spots} now={now} tariff={tariff} onPick={goTo} />
       </section>
 
       <aside className="dock">
@@ -581,13 +625,13 @@ export default function GuardPanel({ lot, spots, tariff, reload, lastEvent, noti
         </form>
 
         <Suspense fallback={<div className="gate" />}>
-          <Gate3D lot={lot} event={lastEvent} arrival={arrival} reject={reject} release={release} spots={view} focusZone={zone} onPlateRead={plateRead} />
+          <Gate3D event={lastEvent} arrival={arrival} reject={reject} release={release} spots={view} focusZone={zone} onPlateRead={plateRead} />
         </Suspense>
         <button className="btn ghost sm cam-demo" onClick={() => setArrival({ plate: randomPlate(), at: Date.now() })}>
           <Icon name="camera" /> Kamera oldiga mashina keldi (sinov)
         </button>
         <button className={`btn ghost sm cam-demo${auto ? ' on' : ''}`} onClick={() => setAuto((v) => !v)} aria-pressed={auto}>
-          {auto ? "Avtomatik oqim: yoqilgan (har 2 daqiqada 1 kirish, 1 chiqish)" : "Avtomatik oqim: o'chirilgan"}
+          {auto ? 'Avtomatik oqim: yoqilgan (har daqiqada 3 kirish, 1 chiqish)' : "Avtomatik oqim: o'chirilgan"}
         </button>
 
         {arrived && (

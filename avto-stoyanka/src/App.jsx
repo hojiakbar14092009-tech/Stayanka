@@ -106,13 +106,6 @@ export default function App() {
           <span className="counter free"><b>{free}</b> bo'sh</span>
           <span className="counter busy"><b>{taken}</b> band</span>
           <span className="counter cash"><small>Bugun</small><b>{money(revenue.total)}</b></span>
-          {user.role === 'admin' ? (
-            <span className="seg lot-switch" role="group" aria-label="Stoyanka">
-              {[1, 2].map((n) => <button key={n} type="button" className={lot === n ? 'on' : ''} onClick={() => chooseLot(n)}>{n}-stoyanka</button>)}
-            </span>
-          ) : (
-            <span className="counter lot-tag"><b>{lot}</b><small>-stoyanka</small></span>
-          )}
         </div>
         <div className="who">
           <span>{user.full_name}</span>
@@ -126,7 +119,7 @@ export default function App() {
       </header>
 
       <main className="content">
-        {tab === 'lot' && <GuardPanel key={lot} lot={lot} spots={spots} tariff={tariff} reload={reload} lastEvent={lastEvent} notify={notify} />}
+        {tab === 'lot' && <GuardPanel spots={spots} tariff={tariff} reload={reload} lastEvent={lastEvent} notify={notify} />}
         {tab === 'archive' && <Archive key={lot} />}
         {tab === 'overview' && <Overview key={lot} spots={spots} lastEvent={lastEvent} />}
         {tab === 'spots' && <SpotsAdmin spots={spots} reload={reload} />}

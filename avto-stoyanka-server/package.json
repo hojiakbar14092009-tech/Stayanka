@@ -8,7 +8,7 @@
     "init-db": "node --env-file-if-exists=.env init-db.js",
     "test": "node --test",
     "demo": "node --env-file-if-exists=.env demo-data.js",
-    "local": "pglite-server --db=./.pgdata --port=5433 --max-connections=4 --run=\"node --env-file-if-exists=.env server.js\"",
+    "local": "node local.js",
     "local:init-db": "pglite-server --db=./.pgdata --port=5433 --run=\"node --env-file-if-exists=.env init-db.js\""
   },
   "dependencies": {

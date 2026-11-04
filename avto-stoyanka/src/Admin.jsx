@@ -247,22 +247,13 @@ export function UsersAdmin({ me }) {
         <h2>Profillar</h2>
         <div className="table-wrap">
           <table className="table">
-            <thead><tr><th>Ism</th><th>Login</th><th>Rol</th><th>Stoyanka</th><th>Holat</th><th /></tr></thead>
+            <thead><tr><th>Ism</th><th>Login</th><th>Rol</th><th>Holat</th><th /></tr></thead>
             <tbody>
               {users.map((u) => (
                 <tr key={u.id} className={u.active ? '' : 'dim'}>
                   <td>{u.full_name}</td>
                   <td className="mono">{u.username}</td>
                   <td>{u.role === 'admin' ? 'Admin' : 'Qorovul'}</td>
-                  <td>
-                    {u.role === 'guard' ? (
-                      <select className="input sm" value={u.lot || 1} aria-label={`${u.full_name} stoyankasi`}
-                        onChange={(e) => run(() => api(`/admin/users/${u.id}`, { method: 'PUT', body: { lot: Number(e.target.value) } }), 'Stoyanka almashtirildi')}>
-                        <option value={1}>1-stoyanka</option>
-                        <option value={2}>2-stoyanka</option>
-                      </select>
-                    ) : 'Ikkalasi'}
-                  </td>
                   <td>
                     <button className="btn ghost sm" disabled={u.id === me.id}
                       onClick={() => run(() => api(`/admin/users/${u.id}`, { method: 'PUT', body: { active: !u.active } }), u.active ? "Profil to'xtatildi" : 'Profil faollashtirildi')}>
@@ -291,14 +282,7 @@ export function UsersAdmin({ me }) {
             <option value="admin">Admin</option>
           </select>
         </label>
-        {form.role === 'guard' && (
-          <label>Stoyanka
-            <select className="input" value={form.lot} onChange={(e) => setForm({ ...form, lot: Number(e.target.value) })}>
-              <option value={1}>1-stoyanka (garaj, mall yonida)</option>
-              <option value={2}>2-stoyanka (park yonida)</option>
-            </select>
-          </label>
-        )}
+
         <button className="btn primary">Profil qo'shish</button>
       </form>
     </div>

@@ -822,10 +822,6 @@ label { display: grid; gap: .3rem; font-size: .9rem; color: var(--paint-dim); }
 .vip-perks td { padding: 0; font-size: .88rem; }
 .vip-perks td:first-child { color: var(--yellow); display: grid; place-items: center; }
 
-/* Stoyanka: qorovulda belgi, adminda almashtirgich */
-.counter.lot-tag { background: #3a3f47; }
-.lot-switch { align-self: center; }
-.lot-switch button { white-space: nowrap; }
 
 /* Erkin kamera: maslahat yoki "Avtomatik kamera" tugmasi (o'ng yuqori burchak) */
 .gate-free {
@@ -835,3 +831,10 @@ label { display: grid; gap: .3rem; font-size: .9rem; color: var(--paint-dim); }
 .gate-free:hover { background: rgba(20, 22, 26, .85); }
 .gate-free.hint { pointer-events: none; font-weight: 500; opacity: .8; max-width: 58%; text-align: right; }
 .gate-canvas canvas:focus-visible { outline: 2px solid var(--paint); outline-offset: -2px; }
+
+/* Ichkaridagi mashinalar ro'yxati */
+.inside { margin-top: 1rem; }
+.inside h2 { display: flex; gap: .5rem; align-items: baseline; }
+.inside-scroll { max-height: 320px; overflow: auto; }
+.inside-scroll thead th { position: sticky; top: 0; background: var(--asphalt-mid, #2a2d33); }
+.link { background: none; border: 0; padding: 0; color: inherit; font: inherit; text-decoration: underline dotted; cursor: pointer; }

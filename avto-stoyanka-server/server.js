@@ -12,7 +12,11 @@ const pool = new pg.Pool({
   // Lokal PGlite (PG_POOL_MAX=1): bitta ulanish va u hech yopilmaydi — qayta ulanishda PGlite qotib qoladi
   max: Number(process.env.PG_POOL_MAX) || 10,
   idleTimeoutMillis: process.env.PG_POOL_MAX ? 0 : 10000,
+  // Qotmaslik: so'rov 10 s da, bo'sh ulanish kutish 8 s da xato bilan tugaydi (abadiy kutib qolmaydi)
+  query_timeout: 10000,
+  connectionTimeoutMillis: 8000,
 });
+process.on('unhandledRejection', (e) => console.error('Kutilmagan xato:', e?.message || e));
 const app = express();
 // Ochiq sayt (stayanka.vercel.app) shu kompyuterdagi serverga murojaat qilsa, Chrome shu ruxsatni so'raydi
 app.use((req, res, next) => (res.set('Access-Control-Allow-Private-Network', 'true'), next()));
@@ -109,6 +113,7 @@ async function enterCar(req, res) {
   const disabledDriver = req.body?.disabled_driver === true;
   const lot = lotOf(req) || 1;
   const db = await pool.connect();
+  let broken = false;
   try {
     await db.query('BEGIN');
     const dup = await db.query(
@@ -122,7 +127,7 @@ async function enterCar(req, res) {
       : await db.query(`
           UPDATE spots SET is_busy = true WHERE id = (
             SELECT id FROM spots WHERE lot = $3 AND NOT is_busy AND NOT is_disabled AND is_premium = $1 AND ($2 OR NOT is_accessible)
-            ORDER BY ($2 AND is_accessible) DESC, id LIMIT 1 FOR UPDATE SKIP LOCKED)
+            ORDER BY ($2 AND is_accessible) DESC, random() LIMIT 1 FOR UPDATE SKIP LOCKED)
           RETURNING *`, [premium, disabledDriver, lot]);
     if (!spot.rows[0]) {
       throw fail(409, spotId ? 'Bu joy band, yopiq yoki nogironlar uchun ajratilgan' : premium ? "Bo'sh VIP joy qolmadi" : "Bo'sh oddiy joy qolmadi");
@@ -146,11 +151,12 @@ async function enterCar(req, res) {
     };
     res.status(201).json({ spot: s, ticket });
   } catch (e) {
-    await db.query('ROLLBACK');
+    await db.query('ROLLBACK').catch(() => (broken = true));
+    if (/timeout/i.test(e.message)) broken = true;
     if (e.code === '23505') throw fail(409, 'Bu joy hozirgina band qilindi');
     throw e;
   } finally {
-    db.release();
+    db.release(broken);
   }
 }
 
@@ -161,6 +167,7 @@ app.put('/api/expel/:spot_id', (req, res) => closeSession(req, res, false));
 
 async function closeSession(req, res, paid) {
   const db = await pool.connect();
+  let broken = false;
   try {
     await db.query('BEGIN');
     const open = await db.query(`
@@ -187,10 +194,11 @@ async function closeSession(req, res, paid) {
     broadcast({ type: paid ? 'exit' : 'expel', lot: se.lot, plate: se.plate, label: se.label, fee, guard: req.user.full_name });
     res.json(receipt);
   } catch (e) {
-    await db.query('ROLLBACK');
+    await db.query('ROLLBACK').catch(() => (broken = true));
+    if (/timeout/i.test(e.message)) broken = true;
     throw e;
   } finally {
-    db.release();
+    db.release(broken);
   }
 }
 
@@ -369,12 +377,21 @@ await pool.query(`
   INSERT INTO spots (label, zone, is_premium, is_accessible, lot)
     SELECT label, zone, is_premium, is_accessible, 2 FROM spots WHERE lot = 1 AND NOT EXISTS (SELECT 1 FROM spots WHERE lot = 2) ORDER BY id;
   ALTER TABLE users ADD COLUMN IF NOT EXISTS lot SMALLINT;
-  UPDATE users SET lot = CASE WHEN username = 'bekzod' THEN 2 ELSE 1 END WHERE role = 'guard' AND lot IS NULL;
+  UPDATE users SET lot = 1 WHERE role = 'guard' AND (lot IS NULL OR lot = 2); -- hozircha bitta stoyanka ishlaydi
   INSERT INTO settings VALUES ('premium_hour', 30000) ON CONFLICT (key) DO NOTHING;
   DELETE FROM settings WHERE key = 'premium_mult';`).then(() => migrateBoss(pool)).catch((e) => {
   console.error(`Baza tayyor emas (${e.message}). Avval: npm run init-db`);
   process.exit(1);
 });
+
+// Nazoratchi: baza ketma-ket 2 marta javob bermasa — jarayon chiqib ketadi, kuzatuvchi (npm run local / Render) qayta ko'taradi
+let dbFails = 0;
+setInterval(() => {
+  pool.query('SELECT 1').then(() => { dbFails = 0; }, (e) => {
+    console.error('Baza javob bermadi:', e.message);
+    if (++dbFails >= 2) process.exit(1);
+  });
+}, 15000).unref();
 
 const port = process.env.PORT || 3000;
 app.listen(port, () => console.log(`AvtoStoyanka server: http://localhost:${port}`));

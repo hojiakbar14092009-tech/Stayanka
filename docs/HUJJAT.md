@@ -292,3 +292,16 @@ Vercel'dagi sayt shu kompyuterdagi serverga ulanganda Chrome "mahalliy tarmoqqa 
 - Har binoning pastki qavati — 3 ta butik: iliq yorug' vitrina (manekenlar, sumkalar, eshik), nomli peshtoq
   (LUMIÈRE, ZARAFSHON, OLTIN IPAK, SAMARQAND SILK, AURUM ... — o'ylab topilgan nomlar), rangli soyabon, gul tuvaklar, oltin karniz.
 - Minora shakllari: oltin tojli va shpilli shisha, oltin halqali oq silindr, zinapoyasimon tosh (mansard tom), burama shisha.
+
+## 22. Soddalashtirish: faqat stoyanka (bu bo'lim 14–21-bo'limlardagi shahar qismlarini bekor qiladi)
+
+- **3D:** xaritada faqat stoyanka qoldi — darvoza, raqam kamerasi (chap pastda), 3 qavatli 200 joylik garaj, yo'l, daraxtlar,
+  uzoqdagi shahar fon. Mall, park, Humo Arena, hashamatli binolar va ikkinchi garaj olib tashlandi. Erkin kamera qoldi.
+- **Bitta stoyanka:** barcha qorovullar 1-stoyankada (server ishga tushganda o'zi o'tkazadi), admin almashtirgichi yo'q.
+  Serverdagi `lot` ustuni keyinchalik ikkinchi stoyanka uchun saqlab qolindi.
+- **Tasodifiy joy:** mashina bir blokka ketma-ket emas, bo'sh joylardan tasodifiy joyga qo'yiladi (VIP va nogironlar joyi qoidasi o'zgarmagan).
+  Ekrandagi "Keyingi joy" — aynan shu joy.
+- **Avtomatik oqim:** har daqiqada 1 chiqish (QR chek skanerlanadi) va 3 kirish (kamera raqamni o'qiydi, chek chop etiladi).
+- **Ichkaridagi mashinalar:** stoyanka rejasi ostida jadval — raqam, joy, kirgan vaqti, qancha turgani, hozirgi to'lov (har 10 soniyada yangilanadi).
+- **Qotmaslik:** so'rovlar 10 s, ulanish kutish 8 s dan oshsa xato bilan tugaydi; nazoratchi har 15 s bazani tekshiradi,
+  2 marta javob bo'lmasa server chiqib ketadi va `npm run local` (local.js) baza bilan serverni 2 soniyada qayta ko'taradi.
