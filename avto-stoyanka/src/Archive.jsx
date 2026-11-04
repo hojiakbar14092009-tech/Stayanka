@@ -3,7 +3,7 @@ import { useEffect, useState } from 'react';
 import { api, money, dateTime } from './api';
 import Receipt from './Receipt';
 
-export default function Archive() {
+export default function Archive({ showTotal }) {
   const [q, setQ] = useState('');
   const [from, setFrom] = useState('');
   const [to, setTo] = useState('');
@@ -25,7 +25,7 @@ export default function Archive() {
         <input className="input" placeholder="Mashina, chek yoki kirish cheki raqami" value={q} onChange={(e) => setQ(e.target.value)} aria-label="Qidiruv" />
         <label>Dan <input className="input" type="date" value={from} onChange={(e) => setFrom(e.target.value)} /></label>
         <label>Gacha <input className="input" type="date" value={to} onChange={(e) => setTo(e.target.value)} /></label>
-        <p className="archive-sum">{list.length} ta chek, jami <b>{money(total)}</b></p>
+        <p className="archive-sum">{list.length} ta chek{showTotal && <>, jami <b>{money(total)}</b></>}</p>
       </div>
       {error && <p className="error">{error}</p>}
       {list.length === 0 ? (

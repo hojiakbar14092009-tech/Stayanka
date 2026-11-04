@@ -96,47 +96,6 @@ function Bars({ series }) {
   );
 }
 
-// Halqa: tushum qayerga ketadi — ish haqi, xarajatlar, foyda
-function Donut({ money: m }) {
-  const [drawn, setDrawn] = useState(false);
-  useEffect(() => {
-    const t = setTimeout(() => setDrawn(true), 60);
-    return () => clearTimeout(t);
-  }, []);
-  const parts = [
-    ['Ish haqi', m.wages, '#2257d6'],
-    ['Xarajatlar', m.costs, '#e5484d'],
-    [m.profit >= 0 ? 'Foyda' : 'Zarar', Math.abs(m.profit), m.profit >= 0 ? '#2fb679' : '#8a1c20'],
-  ];
-  const sum = Math.max(1, parts.reduce((a, p) => a + p[1], 0));
-  const C = 2 * Math.PI * 52;
-  let offset = 0;
-  return (
-    <div className="donut-wrap">
-      <svg viewBox="0 0 140 140" className="donut" role="img" aria-label="Tushum taqsimoti">
-        <circle cx="70" cy="70" r="52" fill="none" stroke="#3a3e44" strokeWidth="18" />
-        {parts.map(([name, val, color], i) => {
-          const len = (val / sum) * C;
-          const el = (
-            <circle key={name} cx="70" cy="70" r="52" fill="none" stroke={color} strokeWidth="18"
-              strokeDasharray={`${drawn ? len : 0} ${C}`} strokeDashoffset={-offset}
-              style={{ transitionDelay: `${i * 250}ms` }} transform="rotate(-90 70 70)" />
-          );
-          offset += len;
-          return el;
-        })}
-        <text x="70" y="66" textAnchor="middle" className="donut-big">{Math.round((Math.max(0, m.profit) / Math.max(1, m.revenue)) * 100)}%</text>
-        <text x="70" y="84" textAnchor="middle" className="donut-small">foyda ulushi</text>
-      </svg>
-      <ul className="legend-list">
-        {parts.map(([name, val, color]) => (
-          <li key={name}><i style={{ background: color }} />{name}<b><Count value={val} format={money} /></b></li>
-        ))}
-      </ul>
-    </div>
-  );
-}
-
 function Expenses({ list, onChange, setError }) {
   const [form, setForm] = useState({ name: '', amount: '', period: 'month' });
   const run = async (fn) => {
@@ -219,7 +178,6 @@ export default function BossPage() {
 
   const { totals: t, money: m } = data;
   const periodName = PERIODS.find((p) => p[0] === period)[1].toLowerCase();
-  const premiumShare = t.revenue ? Math.round((t.premium_revenue / t.revenue) * 100) : 0;
 
   return (
     <>
@@ -250,42 +208,28 @@ export default function BossPage() {
 
       <div className="tiles boss-tiles">
         <div className="tile"><span><Icon name="car" /> Kirgan mashinalar</span><b><Count value={t.entered} /></b></div>
-        <div className="tile"><span><Icon name="exit" /> Chiqqan</span><b><Count value={t.exited} /></b></div>
         <div className="tile"><span><Icon name="pin" /> Hozir ichkarida</span><b><Count value={t.inside} /></b></div>
-        <div className="tile"><span><Icon name="crown" /> VIP ulushi</span><b><Count value={premiumShare} />%</b></div>
         <div className="tile"><span><Icon name="drop" /> O'rtacha turish</span><b><Count value={t.avg_minutes} /> <small>daq</small></b></div>
-        <div className="tile"><span><Icon name="wheelchair" /> Nogironlar (bepul)</span><b><Count value={t.disabled_free} /></b></div>
         <div className="tile"><span><Icon name="warning" /> To'lanmagan qarz</span><b className="debt"><Count value={t.unpaid} format={money} /></b></div>
       </div>
 
-      <div className="panels two">
-        <section className="card">
-          <h2>{period === 'day' ? 'Bugun soatma-soat' : period === 'week' ? 'Oxirgi 7 kun' : 'Oxirgi 30 kun'}</h2>
-          <Bars series={data.series} />
-          <p className="legend"><span className="key gold" /> tushum <span className="key dot" /> kirgan mashinalar</p>
-        </section>
-        <section className="card">
-          <h2>Tushum qayerga ketadi</h2>
-          <Donut money={m} />
-        </section>
-      </div>
+      <section className="card">
+        <h2>{period === 'day' ? 'Bugun soatma-soat' : period === 'week' ? 'Oxirgi 7 kun' : 'Oxirgi 30 kun'}</h2>
+        <Bars series={data.series} />
+        <p className="legend"><span className="key gold" /> tushum <span className="key dot" /> kirgan mashinalar</p>
+      </section>
 
       <section className="card">
         <h2>Ishchilar ish haqi</h2>
-        <p className="muted small">Qorovul kuniga 200 000, moykachi 150 000 so'm. Har bir ishchi pulni qachon olishni o'zi tanlaydi: kunlik, haftalik yoki oylik.</p>
         <div className="table-wrap">
           <table className="table">
             <thead>
-              <tr><th>Ishchi</th><th>Lavozim</th><th className="num">Kunlik</th><th className="num">Haftalik</th><th className="num">Oylik</th><th>Olish muddati</th><th className="num">Qo'liga</th><th>Keyingi to'lov</th></tr>
+              <tr><th>Ishchi</th><th>Olish muddati</th><th className="num">Qo'liga</th><th>Keyingi to'lov</th></tr>
             </thead>
             <tbody>
               {data.workers.map((w) => (
                 <tr key={w.id}>
-                  <td>{w.full_name}</td>
-                  <td>{w.role === 'guard' ? 'Qorovul' : 'Moykachi'}</td>
-                  <td className="num">{money(w.day)}</td>
-                  <td className="num">{money(w.week)}</td>
-                  <td className="num">{money(w.month)}</td>
+                  <td>{w.full_name} <small className="muted">{w.role === 'guard' ? 'qorovul' : 'moykachi'}</small></td>
                   <td>
                     <div className="seg mini" role="group" aria-label={`${w.full_name} olish muddati`}>
                       {PAY.map(([k, label]) => (
@@ -299,27 +243,17 @@ export default function BossPage() {
               ))}
             </tbody>
             <tfoot>
-              <tr><td colSpan={6}>Shu davrda jami ish haqi ({data.days} kun)</td><td className="num gold" colSpan={2}><Count value={m.wages} format={money} /></td></tr>
+              <tr><td colSpan={2}>Shu davrda jami ish haqi ({data.days} kun)</td><td className="num gold" colSpan={2}><Count value={m.wages} format={money} /></td></tr>
             </tfoot>
           </table>
         </div>
       </section>
 
-      <div className="panels two">
-        <section className="card">
-          <h2>Stoyanka xarajatlari</h2>
-          <p className="muted small">Summani o'zgartirib, maydondan chiqing — saqlanadi.</p>
-          <Expenses list={data.expenses} onChange={load} setError={setError} />
-        </section>
-        <section className="card">
-          <h2>Qorovullar bo'yicha tushum</h2>
-          <ol className="leaders">
-            {data.guards.map((g) => (
-              <li key={g.full_name}><span>{g.full_name}</span><span>{g.exits} chek</span><b><Count value={g.revenue} format={money} /></b></li>
-            ))}
-          </ol>
-        </section>
-      </div>
+      <section className="card">
+        <h2>Stoyanka xarajatlari</h2>
+        <p className="muted small">Summani o'zgartirib, maydondan chiqing — saqlanadi.</p>
+        <Expenses list={data.expenses} onChange={load} setError={setError} />
+      </section>
     </main>
     </>
   );

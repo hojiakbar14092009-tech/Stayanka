@@ -37,9 +37,9 @@ const ZONE_POS = { A: [0, 11.8], B: [0, 29.3], C: [1, 11.8], D: [1, 29.3], E: [2
 const HELIX = { x: 52.6, z: -16.9, r: 3.9 }; // yuqoriga chiqish rampasi
 const HELIX_DOWN = { x: 6, z: -16.9, r: 3.9 }; // pastga tushish rampasi (chiqish yo'liga yaqin)
 // Kamera: darvoza ko'rinishi va bo'sh paytdagi sayr nuqtalari [qaraladigan nuqta, kamera siljishi]
-const GATE_VIEW = [new THREE.Vector3(15, 4, -16), new THREE.Vector3(0, 13, 42)]; // to'g'ridan: darvoza, garaj va ortida Humo Arena
+const GATE_VIEW = [new THREE.Vector3(5, 1.4, -4.5), new THREE.Vector3(-5, 11, 21)]; // qorovul uchun: oldinda budka, ikki yo'lak va shlagbaumlar, ortida garaj kirishi
 // Bo'sh payt: umumiy ko'rinish — darvoza va butun garaj
-const OVERVIEW = [new THREE.Vector3(28, 3, -14), new THREE.Vector3(0, 40, 64)]; // butun garaj va darvoza
+const OVERVIEW = [new THREE.Vector3(17, 2, -9), new THREE.Vector3(-12, 25, 38)]; // budka va butun garaj
 const Y_AXIS = new THREE.Vector3(0, 1, 0);
 
 // "B-07" → 3D joy: qavat, koordinata, qaysi yo'lakdan kiriladi, mashina qaysi tomonga qaraydi
@@ -324,15 +324,6 @@ const brickTex = () => canvasTex(256, 256, (g, w, h) => {
     g.fillRect(x + 1, row * 16 + 1, 32, 14);
   }
 }, [2, 1]);
-// Bino derazalari
-const facadeTex = (lit) => canvasTex(256, 512, (g, w, h) => {
-  g.fillStyle = '#b9b2a6';
-  g.fillRect(0, 0, w, h);
-  for (let y = 16; y < h - 20; y += 44) for (let x = 14; x < w - 20; x += 40) {
-    g.fillStyle = Math.random() < lit ? '#ffe2a8' : '#5d7590';
-    g.fillRect(x, y, 24, 30);
-  }
-});
 // Osmon: kechki gradient
 const skyTex = () => {
   const t = canvasTex(16, 512, (g, w, h) => {
@@ -574,13 +565,6 @@ function buildWorld(scene, gate) {
   // Ko'cha chiroqlari ikki tomonda
   for (const x of [-12, -4, 4]) buildLamp(scene, x, -ROAD_EDGE - 0.6, 1);
   for (const x of [6, 14, 26, 40, 54, 68, 100, 116]) buildLamp(scene, x, ROAD_EDGE + 0.6, -1); // old tomonda — kamerani to'smaydigan joylarda
-  // Uzoqdagi binolar (shahar fon) — ortda
-  for (let i = 0; i < 30; i++) {
-    const h = 12 + ((i * 37) % 7) * 3;
-    const bw = 6 + (i % 3) * 2;
-    const bld = mesh(new THREE.BoxGeometry(bw, h, 6), new THREE.MeshStandardMaterial({ map: facadeTex(0.25), roughness: 0.8 }), { x: -50 + i * 7.6, y: h / 2, z: -72 - (i % 2) * 6, shadow: false });
-    scene.add(bld);
-  }
   // "P" belgisi kirishda
   const pTex = textTexture('P', { w: 128, h: 128, bg: '#2257d6', font: 'bold 96px Arial' });
   gate.add(box(0.08, 2.8, 0.08, mat(0x8a8f96), { x: -4.2, y: 1.4, z: -ROAD_EDGE - 0.6 }));
@@ -986,7 +970,42 @@ function buildGarage(scene) {
     tagTex.needsUpdate = true;
     return { x: bx + 5 * PITCH, y: lv * FLOOR_H, z: cz, level: lv };
   };
-  return { levels, drawBoard, sensorAt, marker, showZone };
+  // ---------- Har zonaning o'z kirishi: ikkala yo'lakda shlagbaumli darvoza va "B zona — kirish" peshtoqi ----------
+  // 1-qavatda mashinalar g'arbdan (darvozadan) keladi, yuqori qavatlarda — sharqiy rampadan; darvoza shu tomonda turadi
+  const armTex = canvasTex(256, 16, (c, w, h) => {
+    for (let i = 0; i < 8; i++) {
+      c.fillStyle = i % 2 ? '#d63a3a' : '#f4f3ef';
+      c.fillRect(i * 32, 0, 32, h);
+    }
+  }, [1, 1]);
+  const gates = [];
+  const GATE_AT = { A: [0, ZONE_POS.A[1], 1], B: [0, ZONE_POS.B[1], 1], C: [1, ZONE_POS.C[1] + 10 * PITCH, -1], D: [1, ZONE_POS.D[1] + 10 * PITCH, -1], E: [2, ZONE_POS.E[1] + 10 * PITCH, -1] };
+  for (const [zone, [lv, gx, from]] of Object.entries(GATE_AT)) {
+    const vip = zone === 'A';
+    const postMat = fading(lv, mat(vip ? 0xd4a93a : 0x2a2d33, { metalness: 0.6, roughness: 0.35 }));
+    const armMat = fading(lv, new THREE.MeshStandardMaterial({ map: armTex, roughness: 0.5 }));
+    const boxMat = fading(lv, mat(0xf2c230, { roughness: 0.5 }));
+    const tex = textTexture(vip ? '♛  A zona · kirish' : zone + ' zona · kirish', { w: 512, h: 96, bg: vip ? '#121316' : '#1d4fc4', fg: vip ? '#f2c230' : '#ffffff', font: 'bold 52px Arial' });
+    const signMat = fading(lv, new THREE.MeshStandardMaterial({ map: tex, emissive: 0xffffff, emissiveMap: tex, emissiveIntensity: 0.5 }));
+    for (const laneZ of [G.lane1, G.lane2]) {
+      const g = new THREE.Group();
+      g.position.set(gx, lv * FLOOR_H, laneZ);
+      for (const dz of [-1.75, 1.75]) g.add(box(0.12, 2.5, 0.12, postMat, { y: 1.25, z: dz }));
+      g.add(box(0.12, 0.12, 3.62, postMat, { y: 2.5 }));
+      const sign = mesh(new THREE.PlaneGeometry(3.3, 0.6), signMat, { x: -from * 0.08, y: 2.15, shadow: false });
+      sign.rotation.y = from > 0 ? -Math.PI / 2 : Math.PI / 2; // kelayotgan mashinaga qaragan
+      g.add(sign);
+      g.add(box(0.28, 0.95, 0.28, boxMat, { x: -from * 0.3, y: 0.48, z: -1.6 })); // shlagbaum qutisi
+      const pivot = new THREE.Group();
+      pivot.position.set(-from * 0.3, 0.95, -1.6);
+      const arm = box(0.08, 0.08, 3.3, armMat, { z: 1.65, shadow: false });
+      pivot.add(arm);
+      g.add(pivot);
+      add(lv, g);
+      gates.push({ pivot, x: gx, y: lv * FLOOR_H, z: laneZ, open: 0 });
+    }
+  }
+  return { levels, drawBoard, sensorAt, marker, showZone, gates };
 }
 
 // Ikki qorovul: budkadagi — keksaroq, yashil forma, oq mo'ylov; tashqaridagi — yosh, ko'k forma, jilet
@@ -1265,6 +1284,14 @@ export default function Gate3D({ event, arrival, reject, release, spots, focusZo
         garage.marker.visible = false;
       }
       if (focus) for (const c of garage.marker.children) c.material.opacity = (c.isSprite ? 1.4 : c.geometry.type === 'PlaneGeometry' ? 0.22 : 1.2) * (0.6 + 0.4 * Math.sin(time * 5));
+
+      // Zona darvozalari: yonida harakatlanayotgan mashina bo'lsa shlagbaum ko'tariladi, o'tib ketgach tushadi
+      const gateCars = [cars.in, cars.out, ...transits.map((tr) => tr.car)].filter((c) => c.visible);
+      for (const gt of garage.gates) {
+        const near = gateCars.some((c) => Math.abs(c.position.y - gt.y) < 1.5 && Math.abs(c.position.x - gt.x) < 5.5 && Math.abs(c.position.z - gt.z) < 2.6);
+        gt.open += ((near ? 1 : 0) - gt.open) * Math.min(1, dt * 4);
+        gt.pivot.rotation.x = -gt.open * 1.35;
+      }
 
       // Garaj "kesimi": mashina pastki qavatda yursa, ustidagi qavatlar shaffof bo'lib, ichkari ko'rinadi
       const mover = (states.in?.moving && cars.in.visible && cars.in) || transits.at(-1)?.car || (states.out?.moving && cars.out.visible && cars.out) || null;

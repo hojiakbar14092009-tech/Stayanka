@@ -305,3 +305,18 @@ Vercel'dagi sayt shu kompyuterdagi serverga ulanganda Chrome "mahalliy tarmoqqa 
 - **Ichkaridagi mashinalar:** stoyanka rejasi ostida jadval — raqam, joy, kirgan vaqti, qancha turgani, hozirgi to'lov (har 10 soniyada yangilanadi).
 - **Qotmaslik:** so'rovlar 10 s, ulanish kutish 8 s dan oshsa xato bilan tugaydi; nazoratchi har 15 s bazani tekshiradi,
   2 marta javob bo'lmasa server chiqib ketadi va `npm run local` (local.js) baza bilan serverni 2 soniyada qayta ko'taradi.
+
+## 23. Zona darvozalari, LED tablo, pul statistikasi faqat rahbariyatga
+
+- **Har zonaning o'z kirishi (3D):** garaj ichida har zona oldida ikkala yo'lakda shlagbaumli darvoza va «B zona · kirish» peshtog'i
+  (A — oltin, VIP). 1-qavatda (A, B) darvoza g'arb tomonda (mashinalar darvozadan keladi), yuqori qavatlarda (C, D, E) — sharqda
+  (mashinalar sharqiy rampadan chiqadi). Yonida harakatlanayotgan mashina bo'lsa shlagbaum ko'tariladi.
+- **Sahna:** orqa fondagi binolar olib tashlandi — faqat stoyanka. Darvoza kamerasi qorovul uchun: kadr o'rtasida budka va qorovul,
+  chapda kelayotgan mashina va shlagbaum, ortida garaj kirishi. Bo'sh paytda — budka bilan butun garaj.
+- **Tepadagi hisoblagichlar** — stoyanka kirishidagi LED tablo: qora nuqtali panel, «bo'sh joy» qahrabo, «band» qizil yonadi
+  (`DotGothic16` shrifti). Butun ilovada «bo'sh / tayyor» belgisi endi yashil emas, qahrabo LED (`--led`).
+- **Qorovul pulni ko'rmaydi:** tepadagi «Bugun» tushumi va cheklar arxividagi jami summa faqat adminda; server `GET /api/revenue`
+  qorovulga 403 qaytaradi. Har chekning o'z summasi (to'lov olish uchun) qoladi.
+- **Boshliq sahifasi soddalashdi:** davr tanlash, sof foyda tenglamasi, 4 ta ko'rsatkich (kirgan, ichkarida, o'rtacha turish, qarz),
+  bitta grafik, ish haqi jadvali (ishchi, olish muddati, qo'liga, keyingi to'lov) va xarajatlar. Halqa diagramma,
+  qorovullar reytingi va takroriy ustunlar olib tashlandi.

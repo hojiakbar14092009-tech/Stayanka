@@ -39,13 +39,14 @@ export default function App() {
     setTimeout(() => setToasts((t) => t.filter((x) => x.id !== id)), 4500);
   }, []);
 
-  // Sahifa ochilganda: spots, tushum va tarif
+  // Sahifa ochilganda: spots, tarif va (faqat adminga) bugungi tushum — qorovul pul statistikasini ko'rmaydi
+  const isAdmin = user?.role === 'admin';
   const reload = useCallback(async () => {
-    const [s, r, t] = await Promise.all([api('/spots'), api('/revenue'), api('/tariff')]);
+    const [s, r, t] = await Promise.all([api('/spots'), isAdmin ? api('/revenue') : null, api('/tariff')]);
     setSpots(s);
-    setRevenue(r);
+    if (r) setRevenue(r);
     setTariff(t);
-  }, []);
+  }, [isAdmin]);
 
   // Yuklanish tugadi: saqlangan sessiya bo'lsa — to'g'ridan-to'g'ri panelga
   const ready = useCallback((ctx) => {
@@ -102,10 +103,11 @@ export default function App() {
           <span className="p-sign sm" aria-hidden="true">P</span>
           <span>AvtoStoyanka</span>
         </div>
-        <div className="counters" aria-live="polite">
-          <span className="counter free"><b>{free}</b> bo'sh</span>
-          <span className="counter busy"><b>{taken}</b> band</span>
-          <span className="counter cash"><small>Bugun</small><b>{money(revenue.total)}</b></span>
+        {/* Stoyanka kirishidagi LED tablo kabi: qora panel, yonib turgan raqamlar */}
+        <div className="counters board" aria-live="polite">
+          <span className="cell free"><b>{free}</b><small>bo'sh joy</small></span>
+          <span className="cell busy"><b>{taken}</b><small>band</small></span>
+          {isAdmin && <span className="cell cash"><b>{money(revenue.total).replace(" so'm", '')}</b><small>bugun, so'm</small></span>}
         </div>
         <div className="who">
           <span>{user.full_name}</span>
@@ -120,7 +122,7 @@ export default function App() {
 
       <main className="content">
         {tab === 'lot' && <GuardPanel spots={spots} tariff={tariff} reload={reload} lastEvent={lastEvent} notify={notify} />}
-        {tab === 'archive' && <Archive key={lot} />}
+        {tab === 'archive' && <Archive key={lot} showTotal={isAdmin} />}
         {tab === 'overview' && <Overview key={lot} spots={spots} lastEvent={lastEvent} />}
         {tab === 'spots' && <SpotsAdmin spots={spots} reload={reload} />}
         {tab === 'tariff' && <TariffAdmin key={JSON.stringify(tariff)} tariff={tariff} reload={reload} />}

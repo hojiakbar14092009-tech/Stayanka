@@ -204,6 +204,7 @@ async function closeSession(req, res, paid) {
 
 // ---------- 4. GET /api/revenue — bugungi tushum ----------
 app.get('/api/revenue', async (req, res) => {
+  if (req.user.role === 'guard') throw fail(403, 'Tushum faqat admin va boshliq uchun');
   const { rows } = await pool.query(`
     SELECT COALESCE(SUM(se.fee), 0)::int AS total, count(*)::int AS count
     FROM sessions se JOIN spots s ON s.id = se.spot_id
