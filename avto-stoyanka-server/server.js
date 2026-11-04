@@ -97,7 +97,8 @@ app.get('/api/tariff', async (req, res) => res.json(await getTariff()));
 // ---------- 2. POST /api/enter — joy band, yangi sessiya ----------
 // spot_id berilmasa — keyingi bo'sh joy: blok to'lmaguncha keyingisiga o'tmaydi (id tartibi = B-01..B-40, C-01..).
 // Premium joy faqat mijoz xohlasa (premium: true) — oddiy mashina hech qachon avtomatik premiumga tushmaydi.
-app.post('/api/enter', async (req, res) => {
+app.post('/api/enter', enterCar);
+async function enterCar(req, res) {
   const plate = normPlate(req.body?.plate);
   const spotId = req.body?.spot_id ? Number(req.body.spot_id) : null;
   const premium = req.body?.premium === true;
@@ -137,7 +138,7 @@ app.post('/api/enter', async (req, res) => {
     broadcast({ type: 'enter', plate, label: s.label, is_premium: s.is_premium, disabled_driver: disabledDriver, guard: req.user.full_name, debt: debtSum });
     const ticket = {
       ticket_no: ticketNo, plate, label: s.label, spot_id: s.id, is_premium: s.is_premium, disabled_driver: disabledDriver, debt: debtSum,
-      entered_at, active: true, guard_in_name: req.user.full_name, tariff: await getTariff(),
+      entered_at, active: true, guard_in_name: req.user.full_name, tariff: await getTariff(db),
     };
     res.status(201).json({ spot: s, ticket });
   } catch (e) {
@@ -147,7 +148,7 @@ app.post('/api/enter', async (req, res) => {
   } finally {
     db.release();
   }
-});
+}
 
 // ---------- 3. PUT /api/exit/:spot_id — joy bo'sh, sessiya yopiladi, chek ----------
 // PUT /api/expel/:spot_id — mijoz to'lay olmadi: qorovul haydab chiqaradi, summa qarz bo'lib yoziladi

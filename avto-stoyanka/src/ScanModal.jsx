@@ -20,7 +20,7 @@ function beep(ok) {
   }
 }
 
-export default function ScanModal({ code, onClose, onExit }) {
+export default function ScanModal({ code, auto, onClose, onExit }) {
   const [phase, setPhase] = useState('scan');
   const [ticket, setTicket] = useState(null);
   const [error, setError] = useState('');
@@ -55,6 +55,13 @@ export default function ScanModal({ code, onClose, onExit }) {
       setBusy(false);
     }
   }
+
+  // Avtomatik oqim: chek faol bo'lsa to'lov qabul qilinib chiqariladi, aks holda oyna yopiladi
+  useEffect(() => {
+    if (!auto || phase !== 'done') return;
+    const t = setTimeout(() => (ticket?.active ? exit(true) : onClose()), 3000);
+    return () => clearTimeout(t);
+  }, [auto, phase]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const stay = ticket?.stay ?? 0;
 

@@ -320,6 +320,8 @@ function MiniMap({ list, foundIds }) {
   );
 }
 
+let lastAuto = Date.now() - 55000; // birinchi avtomatik qadam panel ochilgandan ~5 soniyadan keyin
+
 export default function GuardPanel({ spots, tariff, reload, lastEvent, notify }) {
   const [zone, setZone] = useState('B');
   const [selectedId, setSelectedId] = useState(null);
@@ -341,6 +343,11 @@ export default function GuardPanel({ spots, tariff, reload, lastEvent, notify })
   const [arrivePremium, setArrivePremium] = useState(false);
   const [arriveDisabled, setArriveDisabled] = useState(false);
   const plateInput = useRef(null);
+  // Avtomatik oqim: har daqiqada bitta mashina cheki skanerlanib chiqadi, bitta mashina kelib chek oladi — hammasi ekranda
+  const [auto, setAuto] = useState(true);
+  const autoOut = useRef(false); // ochiq skaner/chiqish cheki avtomatik oqimniki
+  const autoIn = useRef(false); // darvozadagi mashina avtomatik oqimniki
+  const live = useRef({});
   const now = useNow();
 
   const selected = spots.find((s) => s.id === selectedId);
@@ -394,6 +401,54 @@ export default function GuardPanel({ spots, tariff, reload, lastEvent, notify })
     if (ticket?.handover) letIn(ticket.spot_id, ticket.plate, spots.find((s) => s.id === ticket.spot_id)?.label);
     setTicket(null);
   };
+
+  useEffect(() => {
+    if (!auto) return;
+    const timers = [];
+    const tick = () => {
+      const { ticket, scanning, receipt, arrived, view } = live.current;
+      // Qorovul o'zi ishlayapti — keyinroq. Oxirgi qadam vaqti modulda: panel qayta ochilsa ham daqiqada bittadan oshmaydi
+      if (ticket || scanning || receipt || arrived || Date.now() - lastAuto < 60000) return;
+      lastAuto = Date.now();
+      const parked = view.filter((x) => x.is_busy && x.ticket_no);
+      const out = parked[Math.floor(Math.random() * parked.length)];
+      if (out) {
+        autoOut.current = true;
+        setScanning(out.ticket_no);
+      }
+      timers.push(setTimeout(() => {
+        autoIn.current = true;
+        setArrival({ plate: randomPlate(), at: Date.now() });
+      }, out ? 15000 : 0));
+    };
+    const id = setInterval(tick, 5000);
+    return () => { clearInterval(id); timers.forEach(clearTimeout); };
+  }, [auto]);
+
+  // Avtomatik qadamlar: kamera o'qidi → chek chop etiladi → chek berildi, mashina kiradi
+  useEffect(() => {
+    if (!autoIn.current || !arrived) return;
+    const step = arrived.status === 'read'
+      ? () => (live.current.readyFree ? admit(true) : (setReject({ plate: arrived.plate, at: Date.now() }), setArrived(null), (autoIn.current = false)))
+      : arrived.status === 'error'
+        ? () => { setReject({ plate: arrived.plate, at: Date.now() }); setArrived(null); autoIn.current = false; }
+        : null;
+    if (!step) return;
+    const t = setTimeout(step, 2500);
+    return () => clearTimeout(t);
+  }, [arrived?.status]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    if (!autoIn.current || !ticket?.handover) return;
+    const t = setTimeout(() => { autoIn.current = false; closeTicket(); }, 4500);
+    return () => clearTimeout(t);
+  }, [ticket]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    if (!autoOut.current || !receipt) return;
+    const t = setTimeout(() => { autoOut.current = false; setReceipt(null); }, 4500);
+    return () => clearTimeout(t);
+  }, [receipt]);
 
   // Qidiruv: hamma 200 joy bo'ylab — raqam yoki chek raqami bo'yicha
   const term = norm(search);
@@ -465,6 +520,7 @@ export default function GuardPanel({ spots, tariff, reload, lastEvent, notify })
   const view = hidden.size ? spots.map((s) => (hidden.has(s.id) ? { ...s, is_busy: false, plate: null, session_id: null } : s)) : spots;
   const zoneSpots = view.filter((s) => s.zone === zone);
   const readyFree = pickFree(view, arrivePremium, arriveDisabled);
+  live.current = { ticket, scanning, receipt, arrived, view, readyFree };
   const stayMs = selected?.entered_at ? now - new Date(selected.entered_at) : 0;
   const firstHour = (prem) => tariff && money(prem ? tariff.premium_hour : tariff.base_hour);
 
@@ -529,6 +585,9 @@ export default function GuardPanel({ spots, tariff, reload, lastEvent, notify })
         </Suspense>
         <button className="btn ghost sm cam-demo" onClick={() => setArrival({ plate: randomPlate(), at: Date.now() })}>
           <Icon name="camera" /> Kamera oldiga mashina keldi (sinov)
+        </button>
+        <button className={`btn ghost sm cam-demo${auto ? ' on' : ''}`} onClick={() => setAuto((v) => !v)} aria-pressed={auto}>
+          {auto ? "Avtomatik oqim: yoqilgan (har daqiqada 1 kirish, 1 chiqish)" : "Avtomatik oqim: o'chirilgan"}
         </button>
 
         {arrived && (
@@ -642,7 +701,7 @@ export default function GuardPanel({ spots, tariff, reload, lastEvent, notify })
       </aside>
 
       {ticket && <Ticket ticket={ticket} onClose={closeTicket} closeLabel={ticket.handover ? 'Chek berildi, kirgizish' : 'Yopish'} />}
-      {scanning && <ScanModal code={scanning} onClose={() => setScanning(null)} onExit={afterExit} />}
+      {scanning && <ScanModal code={scanning} auto={autoOut.current} onClose={() => { autoOut.current = false; setScanning(null); }} onExit={afterExit} />}
       {receipt && <Receipt receipt={receipt} onClose={() => setReceipt(null)} />}
     </div>
   );
