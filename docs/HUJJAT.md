@@ -320,3 +320,20 @@ Vercel'dagi sayt shu kompyuterdagi serverga ulanganda Chrome "mahalliy tarmoqqa 
 - **Boshliq sahifasi soddalashdi:** davr tanlash, sof foyda tenglamasi, 4 ta ko'rsatkich (kirgan, ichkarida, o'rtacha turish, qarz),
   bitta grafik, ish haqi jadvali (ishchi, olish muddati, qo'liga, keyingi to'lov) va xarajatlar. Halqa diagramma,
   qorovullar reytingi va takroriy ustunlar olib tashlandi.
+
+## 24. Kim kiritgani, o'g'irlangan mashinalar va tekshiruvchilar, Novikov tepa paneli
+
+- **Kim kiritgani:** «Ichkaridagi mashinalar» jadvalida — kun va soat (04.11, 17:53) va kiritgan qorovul (smenadagi qorovul nomidan:
+  Aziz kirsa — Aziz, Bekzod kirsa — Bekzod). Cheklar arxivida «Kiritdi» va «Chiqardi» ustunlari.
+- **Qidiruvdagi raqamlar** (`wanted`): admin «Xavfsizlik» bo'limida qo'shadi/olib tashlaydi (namuna uchun 5 ta raqam bor).
+  Avtomatik oqimda taxminan 25 mashinadan biri qidiruvdagi raqam bilan keladi.
+- **Tekshiruvchilar** (`staff.role = 'inspector'`): smenada ko'pi bilan 2 kishi (server tekshiradi). Admin yangi tekshiruvchi qo'shadi va
+  smenaga qo'yadi. 3D da to'q sariq kiyimda yuradi: 1-chisi 1-qavat (A, B), 2-chisi 2–3-qavatlar (C, D, E); boshi ustida ismi va
+  «B-03 sari / B-03 tekshirilmoqda». 2D rejada tekshirilayotgan joyda ism belgisi, panelda «Tekshiruvchilar» kartasi.
+- **O'g'irlangan topilsa:** hammaga qizil ogohlantirish (raqam, joy, kim topdi, qidiruv sababi), `stolen_found` ga yoziladi,
+  «O'g'irlanganlar» ro'yxatida turadi, jadvalda va rejada qizil belgi. Bunday mashina chiqarilmaydi (server 409);
+  admin «Militsiyaga topshirildi» bosganda sessiya to'lovsiz yopiladi, joy bo'shaydi.
+- **Avtomatik oqim:** har daqiqada 3 kirish; stoyanka 85% to'lsa kirishlar orasida birma-bir chiqadi (o'g'irlanganlar chiqmaydi).
+- **Tepa panel:** Novikov restorani fasadi (oltin chiziqlar, kamar derazalar, fonarlar), peshtoqda NOVIKOV — ikkinchi «O» rul g'ildiragi.
+  Past kontrastda, o'ng tomonda: raqam va yozuvlarga xalaqit bermaydi. LED raqamlar o'zgarganda yumshoq siljib almashadi.
+- **Mini-xarita:** bo'sh joy — chiziqli bo'sh katak, band — yonib turgan qizil, nogironlar — ko'k chiziq (yashil yo'q).

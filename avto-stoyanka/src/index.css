@@ -214,7 +214,7 @@ label { display: grid; gap: .3rem; font-size: .9rem; color: var(--paint-dim); }
 .gate { position: relative; height: 270px; border-radius: 10px; overflow: hidden; background: var(--asphalt); }
 .gate-canvas { position: absolute; inset: 0; }
 .gate-caption {
-  position: absolute; right: 10px; bottom: 10px; display: flex; align-items: center; gap: .5rem;
+  position: absolute; right: 10px; top: 42px; display: flex; align-items: center; gap: .5rem;
   font: 600 1rem var(--display); background: rgba(33, 35, 40, .85); padding: .3rem .6rem; border-radius: 6px;
   animation: caption 3.8s ease forwards;
 }
@@ -346,8 +346,8 @@ label { display: grid; gap: .3rem; font-size: .9rem; color: var(--paint-dim); }
 
 /* ---------- Zona tabidagi mini-xarita ---------- */
 .mini { grid-column: 1 / -1; display: grid; grid-template-columns: repeat(10, 1fr); gap: 2px; margin-top: .45rem; }
-.mini i { aspect-ratio: 1; border-radius: 1px; background: rgba(47, 182, 121, .55); }
-.mini i.busy { background: var(--red); }
+.mini i { aspect-ratio: 1; border-radius: 1px; background: #17191c; box-shadow: inset 0 0 0 1px rgba(236, 234, 228, .3); }
+.mini i.busy { background: #ff4a3d; box-shadow: 0 0 4px rgba(255, 74, 61, .8); }
 .mini i.off { background: var(--yellow); opacity: .5; }
 .mini i.hit { background: var(--yellow); box-shadow: 0 0 6px var(--yellow); animation: blink .8s steps(2) infinite; }
 .zone-tab.has-hit { border-color: var(--yellow); }
@@ -645,7 +645,7 @@ label { display: grid; gap: .3rem; font-size: .9rem; color: var(--paint-dim); }
 .isa { width: 34px; height: 34px; opacity: .92; flex: none; }
 .isa.small { width: 1.15em; height: 1.15em; vertical-align: -.22em; opacity: 1; }
 .isa-badge { position: absolute; right: 3px; top: 50%; translate: 0 -50%; z-index: 2; font-size: .9rem; line-height: 0; }
-.mini i.acc { background: #3b7bff; }
+.mini i.acc { background: #17191c; box-shadow: inset 0 0 0 1.5px #4f8bff; }
 .key.acc { background: #1e5bd8; }
 .access-toggle {
   width: 100%; margin: .45rem 0 0; display: flex; align-items: center; justify-content: center; gap: .45rem;
@@ -853,3 +853,60 @@ label { display: grid; gap: .3rem; font-size: .9rem; color: var(--paint-dim); }
 .board .free b { color: var(--led); text-shadow: 0 0 6px rgba(255, 178, 30, .75), 0 0 16px rgba(255, 178, 30, .3); }
 .board .busy b { color: #ff4a3d; text-shadow: 0 0 6px rgba(255, 74, 61, .7), 0 0 16px rgba(255, 74, 61, .3); }
 .board .cash b { color: #e9e6dc; text-shadow: 0 0 6px rgba(233, 230, 220, .45); }
+
+/* Tekshiruvchilar va o'g'irlangan mashinalar */
+.inspectors-live { padding: .7rem .9rem; }
+.inspectors-live h3 { margin: 0 0 .4rem; font: 700 1.05rem var(--display); display: flex; gap: .4rem; align-items: center; }
+.inspectors-live ul { list-style: none; margin: 0; padding: 0; display: grid; gap: .3rem; }
+.inspectors-live li { display: grid; grid-template-columns: auto 1fr auto; gap: .5rem; align-items: baseline; }
+.inspectors-live li b { color: #ff9a3d; }
+.checker {
+  position: absolute; left: 50%; bottom: 4px; translate: -50% 0; z-index: 3; white-space: nowrap; pointer-events: none;
+  background: #ff7a1a; color: #15171a; font: 700 .72rem var(--display); padding: .05rem .35rem; border-radius: 4px; animation: blink 1.2s steps(2) infinite;
+}
+.stolen-tag { display: inline-block; margin-left: .35rem; background: #c2141b; color: #fff; font: 700 .72rem var(--display); padding: 0 .35rem; border-radius: 3px; }
+.stall .stolen-tag { position: absolute; top: 18px; left: 50%; translate: -50% 0; margin: 0; z-index: 3; }
+.stall.stolen { box-shadow: inset 0 0 0 3px #c2141b; }
+.table tr.stolen td { background: rgba(194, 20, 27, .18); }
+.stolen-alert {
+  position: relative; width: min(440px, 92vw); padding: 1.4rem 1.4rem 1.2rem; border-radius: 12px; background: #1b1d21; text-align: center;
+  border: 3px solid #c2141b; box-shadow: 0 0 0 6px rgba(194, 20, 27, .25), 0 20px 60px rgba(0, 0, 0, .6);
+}
+.stolen-alert h2 { color: #ff5a5f; font-size: 1.6rem; }
+.stolen-alert .facts { text-align: left; }
+.siren { display: block; width: 46px; height: 46px; margin: 0 auto .6rem; border-radius: 50%; background: #c2141b; box-shadow: 0 0 22px 6px rgba(255, 40, 40, .7); animation: blink .5s steps(2) infinite; }
+.security { display: grid; gap: 1rem; }
+.wanted-list, .inspector-list { list-style: none; margin: 0 0 .8rem; padding: 0; display: grid; gap: .45rem; }
+.wanted-list li, .inspector-list li { display: flex; gap: .6rem; align-items: center; flex-wrap: wrap; }
+.inspector-list li span:first-child { flex: 1; }
+.row-form { display: flex; gap: .5rem; flex-wrap: wrap; }
+.row-form .input { flex: 1 1 160px; }
+.shift-tag { font: 600 .85rem var(--display); color: var(--paint-dim); }
+.shift-tag.on { color: #ff9a3d; }
+
+/* Tepa panel: Novikov — iliq qora fon, oltin chiziqli fasad o'ng tomonda, matnlar ustida */
+.top {
+  overflow: hidden; border-bottom: 1px solid rgba(201, 162, 74, .45);
+  background:
+    radial-gradient(60% 140% at 82% 100%, rgba(201, 162, 74, .16), transparent 70%),
+    linear-gradient(100deg, #141210 0%, #1b1712 50%, #221b12 100%);
+}
+.top > :not(.top-art) { position: relative; z-index: 1; }
+.top-art { position: absolute; inset: 0; z-index: 0; pointer-events: none; }
+.facade { position: absolute; right: 1.5%; bottom: 0; height: 96%; width: min(660px, 52vw); color: rgba(201, 162, 74, .34); }
+.facade .lit { fill: rgba(255, 186, 90, .07); }
+.facade .lamp { fill: rgba(255, 196, 110, .55); stroke: rgba(255, 196, 110, .7); filter: drop-shadow(0 0 4px rgba(255, 190, 100, .8)); }
+.facade .sign { color: rgba(232, 198, 120, .62); }
+.facade .sign text { font: 600 21px 'Cormorant Garamond', Georgia, serif; letter-spacing: 9px; fill: rgba(232, 198, 120, .62); }
+.facade .sign text.sub { font: italic 500 9.5px 'Cormorant Garamond', Georgia, serif; letter-spacing: 3px; fill: rgba(232, 198, 120, .45); }
+.top .who span, .top .tabs button { text-shadow: 0 1px 3px #000; }
+.top .who .btn { background: rgba(20, 18, 14, .78); }
+@media (max-width: 760px) { .facade { opacity: .55; width: 92vw; } }
+
+/* LED raqam almashishi */
+.led-num { position: relative; display: inline-block; overflow: hidden; vertical-align: bottom; }
+.led-new { display: inline-block; animation: led-in .45s cubic-bezier(.2, .7, .2, 1); }
+.led-old { position: absolute; inset: 0; text-align: center; animation: led-out .45s cubic-bezier(.4, 0, .6, 1) forwards; }
+@keyframes led-in { from { transform: translateY(60%); opacity: 0; filter: blur(1.5px); } }
+@keyframes led-out { to { transform: translateY(-60%); opacity: 0; filter: blur(1.5px); } }
+@media (prefers-reduced-motion: reduce) { .led-new, .led-old { animation: none; } .led-old { display: none; } }

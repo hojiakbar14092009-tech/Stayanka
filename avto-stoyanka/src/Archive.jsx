@@ -34,7 +34,7 @@ export default function Archive({ showTotal }) {
         <div className="table-wrap">
           <table className="table">
             <thead>
-              <tr><th>Chek</th><th>Kirish cheki</th><th>Raqam</th><th>Joy</th><th>Kirdi</th><th>Chiqdi</th><th>Qorovul</th><th className="num">Summa</th></tr>
+              <tr><th>Chek</th><th>Kirish cheki</th><th>Raqam</th><th>Joy</th><th>Kirdi</th><th>Kiritdi</th><th>Chiqdi</th><th>Chiqardi</th><th className="num">Summa</th></tr>
             </thead>
             <tbody>
               {list.map((r) => (
@@ -44,6 +44,7 @@ export default function Archive({ showTotal }) {
                   <td><span className="plate sm">{r.plate}</span></td>
                   <td>{r.label}{r.is_premium && <span className="gold"> P+</span>}</td>
                   <td>{dateTime(r.entered_at)}</td>
+                  <td>{r.guard_in_name || '—'}</td>
                   <td>{dateTime(r.left_at)}</td>
                   <td>{r.guard_out_name}</td>
                   <td className={`num${r.paid === false ? ' unpaid' : ''}`}>{r.paid === false && <small>qarz </small>}{r.disabled_driver ? <small>♿ bepul</small> : money(r.fee)}</td>

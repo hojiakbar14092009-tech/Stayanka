@@ -176,6 +176,8 @@ async function closeSession(req, res, paid) {
       WHERE se.spot_id = $1 AND se.left_at IS NULL AND ($2::int IS NULL OR s.lot = $2) FOR UPDATE OF se`, [req.params.spot_id, lotOf(req)]);
     const se = open.rows[0];
     if (!se) throw fail(404, "Bu joyda mashina yo'q");
+    const stolen = await db.query('SELECT 1 FROM stolen_found WHERE session_id = $1', [se.id]);
+    if (stolen.rows[0]) throw fail(409, "Bu mashina o'g'irlangan deb topilgan: chiqarilmaydi, militsiyaga topshiriladi");
 
     const tariff = await getTariff(db);
     const fee = se.disabled_driver ? 0 : calcFee(se.now - se.entered_at, tariff, se.is_premium); // nogironlar uchun bepul
@@ -247,6 +249,33 @@ app.get('/api/receipts', async (req, res) => {
       AND ($4::int IS NULL OR s.lot = $4)
     ORDER BY se.left_at DESC LIMIT 300`, [String(q).trim().replace(/[\s-]/g, ''), from || null, to || null, lotOf(req)]);
   res.json(rows);
+});
+
+// ---------- Xavfsizlik: qidiruvdagi (o'g'irlangan) raqamlar, smenadagi tekshiruvchilar, topilganlar ----------
+app.get('/api/security', async (req, res) => {
+  const [wanted, found, inspectors] = await Promise.all([
+    pool.query('SELECT plate, note, added_at FROM wanted ORDER BY added_at DESC'),
+    pool.query(`SELECT f.id, f.plate, f.spot_label, f.inspector, f.found_at, se.left_at IS NULL AS open
+      FROM stolen_found f LEFT JOIN sessions se ON se.id = f.session_id ORDER BY f.found_at DESC LIMIT 200`),
+    pool.query("SELECT id, full_name, on_shift FROM staff WHERE role = 'inspector' AND active ORDER BY id"),
+  ]);
+  res.json({ wanted: wanted.rows, found: found.rows, inspectors: inspectors.rows });
+});
+
+// Tekshiruvchi stoyankadagi mashina qidiruvda ekanini aniqladi — bir tashrif uchun bir marta yoziladi, hammaga xabar
+app.post('/api/stolen', async (req, res) => {
+  const plate = normPlate(req.body?.plate);
+  const inspector = String(req.body?.inspector || '').trim().slice(0, 60) || 'Tekshiruvchi';
+  const w = await pool.query('SELECT note FROM wanted WHERE plate = $1', [plate]);
+  if (!w.rows[0]) throw fail(404, 'Bu raqam qidiruvda emas');
+  const se = (await pool.query(
+    'SELECT se.id, s.label FROM sessions se JOIN spots s ON s.id = se.spot_id WHERE se.plate = $1 AND se.left_at IS NULL', [plate])).rows[0];
+  if (!se) throw fail(404, 'Bu mashina stoyankada emas');
+  const { rows } = await pool.query(
+    'INSERT INTO stolen_found (plate, spot_label, session_id, inspector) VALUES ($1, $2, $3, $4) ON CONFLICT (session_id) DO NOTHING RETURNING *',
+    [plate, se.label, se.id, inspector]);
+  if (rows[0]) broadcast({ type: 'stolen', plate, label: se.label, inspector, note: w.rows[0].note, at_found: rows[0].found_at });
+  res.status(rows[0] ? 201 : 200).json(rows[0] || { duplicate: true });
 });
 
 // ---------- Admin ----------
@@ -340,6 +369,56 @@ app.put('/api/admin/users/:id', async (req, res) => {
   res.json(rows[0]);
 });
 
+// O'g'irlangan mashina militsiyaga topshirildi: sessiya yopiladi (to'lovsiz), joy bo'shaydi
+app.post('/api/admin/stolen/:id/handover', async (req, res) => {
+  const { rows } = await pool.query(`
+    UPDATE sessions se SET left_at = now(), fee = 0, paid = true, guard_out = $2, receipt_no = 'MT-' || lpad(se.id::text, 6, '0')
+    FROM stolen_found f WHERE f.id = $1 AND se.id = f.session_id AND se.left_at IS NULL
+    RETURNING se.spot_id, se.plate`, [req.params.id, req.user.id]);
+  if (!rows[0]) throw fail(404, 'Mashina allaqachon chiqib ketgan');
+  await pool.query('UPDATE spots SET is_busy = false WHERE id = $1', [rows[0].spot_id]);
+  broadcast({ type: 'security' });
+  res.json({ ok: true });
+});
+
+// Qidiruvdagi raqamlar (IIV / sug'urta xabari bo'yicha)
+app.post('/api/admin/wanted', async (req, res) => {
+  const plate = normPlate(req.body?.plate);
+  const note = String(req.body?.note || '').trim().slice(0, 120);
+  const { rows } = await pool.query(
+    'INSERT INTO wanted (plate, note) VALUES ($1, $2) ON CONFLICT (plate) DO UPDATE SET note = EXCLUDED.note RETURNING *', [plate, note]);
+  broadcast({ type: 'security' });
+  res.status(201).json(rows[0]);
+});
+app.delete('/api/admin/wanted/:plate', async (req, res) => {
+  await pool.query('DELETE FROM wanted WHERE plate = $1', [normPlate(req.params.plate)]);
+  broadcast({ type: 'security' });
+  res.json({ deleted: true });
+});
+
+// Tekshiruvchilar: yangi ishchi qo'shish va smenaga qo'yish (bir smenada ko'pi bilan 2 ta)
+const INSPECTOR_WAGE = 180000;
+app.post('/api/admin/inspectors', async (req, res) => {
+  const name = String(req.body?.full_name || '').trim();
+  if (name.length < 3) throw fail(400, 'Ism va familiyani kiriting');
+  const { rows } = await pool.query(
+    "INSERT INTO staff (full_name, role, daily_wage) VALUES ($1, 'inspector', $2) RETURNING id, full_name, on_shift", [name.slice(0, 60), INSPECTOR_WAGE]);
+  broadcast({ type: 'security' });
+  res.status(201).json(rows[0]);
+});
+app.put('/api/admin/inspectors/:id', async (req, res) => {
+  const onShift = req.body?.on_shift === true;
+  if (onShift) {
+    const { rows } = await pool.query("SELECT count(*)::int AS n FROM staff WHERE role = 'inspector' AND active AND on_shift AND id <> $1", [req.params.id]);
+    if (rows[0].n >= 2) throw fail(409, 'Smenada allaqachon 2 ta tekshiruvchi bor. Avval birini smenadan chiqaring');
+  }
+  const { rows } = await pool.query(
+    "UPDATE staff SET on_shift = $2 WHERE id = $1 AND role = 'inspector' RETURNING id, full_name, on_shift", [req.params.id, onShift]);
+  if (!rows[0]) throw fail(404, 'Tekshiruvchi topilmadi');
+  broadcast({ type: 'security' });
+  res.json(rows[0]);
+});
+
 // Cheklari bor profil o'chmaydi (arxiv saqlanadi) — faqat nofaol qilinadi
 app.delete('/api/admin/users/:id', async (req, res) => {
   if (Number(req.params.id) === req.user.id) throw fail(400, "O'zingizni o'chira olmaysiz");
@@ -379,6 +458,10 @@ await pool.query(`
     SELECT label, zone, is_premium, is_accessible, 2 FROM spots WHERE lot = 1 AND NOT EXISTS (SELECT 1 FROM spots WHERE lot = 2) ORDER BY id;
   ALTER TABLE users ADD COLUMN IF NOT EXISTS lot SMALLINT;
   UPDATE users SET lot = 1 WHERE role = 'guard' AND (lot IS NULL OR lot = 2); -- hozircha bitta stoyanka ishlaydi
+  CREATE TABLE IF NOT EXISTS wanted (plate TEXT PRIMARY KEY, note TEXT NOT NULL DEFAULT '', added_at TIMESTAMPTZ NOT NULL DEFAULT now());
+  CREATE TABLE IF NOT EXISTS stolen_found (
+    id SERIAL PRIMARY KEY, plate TEXT NOT NULL, spot_label TEXT NOT NULL, session_id INTEGER UNIQUE REFERENCES sessions(id),
+    inspector TEXT NOT NULL, found_at TIMESTAMPTZ NOT NULL DEFAULT now());
   INSERT INTO settings VALUES ('premium_hour', 30000) ON CONFLICT (key) DO NOTHING;
   DELETE FROM settings WHERE key = 'premium_mult';`).then(() => migrateBoss(pool)).catch((e) => {
   console.error(`Baza tayyor emas (${e.message}). Avval: npm run init-db`);

@@ -1,5 +1,5 @@
 // Qorovul paneli: tepadan ko'rilgan stoyanka rejasi + o'ng tomonda qidiruv, darvoza (kamera), skaner va amal kartasi
-import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react';
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { api, money, time, duration, calcFee, paintFor, brandFor, washerWow, shapeFor, VIP_PERKS } from './api';
 import Icon from './Icon';
 import Receipt from './Receipt';
@@ -52,7 +52,7 @@ function Car({ plate, premium, leaving, onDone }) {
 }
 
 // Joy. Mashina yo'lakdan burilib kiradi; chiqqanda orqaga yurib, yo'lak bo'ylab ketadi (lane: r = o'ngga, l = chapga).
-function Stall({ spot, face, lane, selected, found, onPick }) {
+function Stall({ spot, face, lane, selected, found, checker, stolen, onPick }) {
   const state = spot.is_disabled ? 'off' : spot.is_busy ? 'busy' : 'free';
   const title = spot.is_disabled ? "ta'mirda" : !spot.is_busy && spot.is_accessible ? "bo'sh, nogironlar uchun" : spot.is_busy ? `band, ${spot.plate}, ${brandFor(spot.plate, spot.is_premium)}` : "bo'sh";
   // Chiqib ketayotgan mashinani animatsiya tugaguncha ko'rsatamiz
@@ -65,7 +65,7 @@ function Stall({ spot, face, lane, selected, found, onPick }) {
   return (
     <button
       data-spot={spot.id}
-      className={`stall ${face} ${lane} ${state}${spot.is_premium ? ' premium' : ''}${spot.is_accessible ? ' accessible' : ''}${selected ? ' selected' : ''}${found ? ' found' : ''}`}
+      className={`stall ${face} ${lane} ${state}${spot.is_premium ? ' premium' : ''}${spot.is_accessible ? ' accessible' : ''}${selected ? ' selected' : ''}${found ? ' found' : ''}${stolen ? ' stolen' : ''}`}
       onClick={() => onPick(spot.id)}
       aria-label={`${spot.label}, ${title}`}
       aria-pressed={selected}
@@ -77,6 +77,8 @@ function Stall({ spot, face, lane, selected, found, onPick }) {
       {leaving && <Car key="out" plate={leaving} premium={spot.is_premium} leaving onDone={() => setLeaving(null)} />}
       {spot.is_busy && <span className="stall-plate">{spot.plate}</span>}
       {found && <span className="pin" aria-hidden="true"><Icon name="pin" size="1.6em" /></span>}
+      {checker && <span className="checker"><Icon name="search" size="1em" /> {checker}</span>}
+      {stolen && <span className="stolen-tag">o'g'irlangan</span>}
     </button>
   );
 }
@@ -107,7 +109,8 @@ const pickFree = (list, prem, dd) => {
 };
 
 // Ichkaridagi mashinalar: kirgan vaqti, qancha turgani va hozirgi to'lov — vaqt o'tishi bilan o'zi qayta hisoblanadi
-function InsideList({ spots, now, tariff, onPick }) {
+const dayTime = (d) => new Date(d).toLocaleString('ru-RU', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
+function InsideList({ spots, now, tariff, stolenPlates, onPick }) {
   const inside = spots.filter((s) => s.is_busy && s.entered_at).sort((a, b) => new Date(b.entered_at) - new Date(a.entered_at));
   return (
     <div className="card inside">
@@ -115,15 +118,19 @@ function InsideList({ spots, now, tariff, onPick }) {
       {inside.length ? (
         <div className="inside-scroll">
           <table className="table">
-            <thead><tr><th>Raqam</th><th>Joy</th><th>Kirdi</th><th>Turdi</th><th className="num">To'lov</th></tr></thead>
+            <thead><tr><th>Raqam</th><th>Joy</th><th>Kirdi</th><th>Kiritdi</th><th>Turdi</th><th className="num">To'lov</th></tr></thead>
             <tbody>
               {inside.map((s) => {
                 const stay = now - new Date(s.entered_at);
                 return (
-                  <tr key={s.id}>
-                    <td><button type="button" className="link mono" onClick={() => onPick(s)}>{s.plate}</button></td>
+                  <tr key={s.id} className={stolenPlates.has(s.plate) ? 'stolen' : ''}>
+                    <td>
+                      <button type="button" className="link mono" onClick={() => onPick(s)}>{s.plate}</button>
+                      {stolenPlates.has(s.plate) && <span className="stolen-tag">o'g'irlangan</span>}
+                    </td>
                     <td>{s.label}{s.is_premium ? ' (VIP)' : ''}</td>
-                    <td>{time(s.entered_at)}</td>
+                    <td>{dayTime(s.entered_at)}</td>
+                    <td>{s.guard_name || '—'}</td>
                     <td>{duration(stay)}</td>
                     <td className="num">{s.disabled_driver ? 'Bepul' : tariff ? money(calcFee(stay, tariff, s.is_premium)) : '…'}</td>
                   </tr>
@@ -292,7 +299,7 @@ function Washer({ lot, dirtyIds, crew, index, claims, plates }) {
 }
 
 // Zona: 4 qator × 10 joy. Ikki qator orasida yo'lak, o'rtada bordyur. Premium zona — yopiq tom ostida.
-function LotMap({ spots, selectedId, foundIds, onPick }) {
+function LotMap({ spots, selectedId, foundIds, checking, stolenPlates, onPick }) {
   const lot = useRef(null);
   const claims = useMemo(() => new Map(), []); // qaysi mashinani qaysi moykachi yuvyapti
   const premium = spots[0]?.is_premium;
@@ -303,7 +310,7 @@ function LotMap({ spots, selectedId, foundIds, onPick }) {
   const row = (list, face, lane) => (
     <div className="stall-row">
       {list.map((s) => (
-        <Stall key={s.id} spot={s} face={face} lane={lane} selected={s.id === selectedId} found={foundIds.has(s.id)} onPick={onPick} />
+        <Stall key={s.id} spot={s} face={face} lane={lane} selected={s.id === selectedId} found={foundIds.has(s.id)} checker={checking.get(s.label)} stolen={s.is_busy && stolenPlates.has(s.plate)} onPick={onPick} />
       ))}
     </div>
   );
@@ -358,7 +365,7 @@ function MiniMap({ list, foundIds }) {
 
 let lastAuto = Date.now() - 55000; // birinchi daqiqa panel ochilgandan ~5 soniyadan keyin boshlanadi
 
-export default function GuardPanel({ spots, tariff, reload, lastEvent, notify }) {
+export default function GuardPanel({ security, spots, tariff, reload, lastEvent, notify }) {
   const [zone, setZone] = useState('B');
   const [selectedId, setSelectedId] = useState(null);
   const [plate, setPlate] = useState('');
@@ -384,6 +391,14 @@ export default function GuardPanel({ spots, tariff, reload, lastEvent, notify })
   const autoOut = useRef(false); // ochiq skaner/chiqish cheki avtomatik oqimniki
   const autoIn = useRef(false); // darvozadagi mashina avtomatik oqimniki
   const live = useRef({});
+  const [inspecting, setInspecting] = useState([]); // 3D dagi tekshiruvchilar holati
+  const checking = useMemo(() => new Map(inspecting.filter((c) => c.label).map((c) => [c.label, c.name])), [inspecting]);
+  const stolenPlates = useMemo(() => new Set(security.found.filter((f) => f.open).map((f) => f.plate)), [security.found]); // hali ichkarida turganlari
+  const wantedPlates = useMemo(() => security.wanted.map((w) => w.plate), [security.wanted]);
+  const shiftNames = useMemo(() => security.inspectors.filter((i) => i.on_shift).map((i) => i.full_name).slice(0, 2), [security.inspectors]);
+  const reportStolen = useCallback((plate, label, inspector) => {
+    api('/stolen', { method: 'POST', body: { plate, inspector } }).catch(() => {}); // takror yoki mashina chiqib ketgan — e'tiborsiz
+  }, []);
   const now = useNow();
 
   const selected = spots.find((s) => s.id === selectedId);
@@ -447,13 +462,16 @@ export default function GuardPanel({ spots, tariff, reload, lastEvent, notify })
         // Daqiqa boshi vaqti modulda: panel qayta ochilsa ham daqiqasiga 1 chiqish + 3 kirishdan oshmaydi
         if (t - lastAuto < 60000) return;
         lastAuto = t;
-        plan = [['out', t], ['in', t + 12000], ['in', t + 28000], ['in', t + 44000]];
+        const fill = live.current.view.filter((x) => x.is_busy).length / Math.max(1, live.current.view.length);
+        plan = fill >= 0.85
+          ? [['in', t], ['out', t + 10000], ['in', t + 20000], ['out', t + 30000], ['in', t + 40000], ['out', t + 50000]]
+          : [['in', t], ['in', t + 20000], ['in', t + 40000]];
       }
       const { ticket, scanning, receipt, arrived, view } = live.current;
       if (ticket || scanning || receipt || arrived || t < plan[0][1]) return; // qorovul o'zi ishlayapti yoki vaqti kelmadi — keyinroq
       const [kind] = plan.shift();
       if (kind === 'out') {
-        const parked = view.filter((x) => x.is_busy && x.ticket_no);
+        const parked = view.filter((x) => x.is_busy && x.ticket_no && !live.current.stolenPlates.has(x.plate)); // o'g'irlangan chiqarilmaydi
         const out = parked[Math.floor(Math.random() * parked.length)];
         if (out) {
           autoOut.current = true;
@@ -461,7 +479,10 @@ export default function GuardPanel({ spots, tariff, reload, lastEvent, notify })
         }
       } else {
         autoIn.current = true;
-        setArrival({ plate: randomPlate(), at: t });
+        // ba'zan (taxminan 25 mashinadan biri) qidiruvdagi mashina keladi — tekshiruvchilar uni topishi kerak
+        const inside = new Set(view.map((x) => x.plate));
+        const wantedOut = live.current.wantedPlates.filter((p) => !inside.has(p));
+        setArrival({ plate: wantedOut.length && Math.random() < 0.04 ? wantedOut[Math.floor(Math.random() * wantedOut.length)] : randomPlate(), at: t });
       }
     };
     const id = setInterval(tick, 1000);
@@ -563,7 +584,7 @@ export default function GuardPanel({ spots, tariff, reload, lastEvent, notify })
   const view = hidden.size ? spots.map((s) => (hidden.has(s.id) ? { ...s, is_busy: false, plate: null, session_id: null } : s)) : spots;
   const zoneSpots = view.filter((s) => s.zone === zone);
   const readyFree = pickFree(spots, arrivePremium, arriveDisabled); // haqiqiy band joylar bo'yicha (darvozadagi mashinaning joyi ham band)
-  live.current = { ticket, scanning, receipt, arrived, view, readyFree };
+  live.current = { ticket, scanning, receipt, arrived, view, readyFree, stolenPlates, wantedPlates };
   const stayMs = selected?.entered_at ? now - new Date(selected.entered_at) : 0;
   const firstHour = (prem) => tariff && money(prem ? tariff.premium_hour : tariff.base_hour);
 
@@ -585,11 +606,11 @@ export default function GuardPanel({ spots, tariff, reload, lastEvent, notify })
             );
           })}
         </nav>
-        <LotMap spots={zoneSpots} selectedId={selectedId} foundIds={foundIds} onPick={pick} />
+        <LotMap spots={zoneSpots} selectedId={selectedId} foundIds={foundIds} checking={checking} stolenPlates={stolenPlates} onPick={pick} />
         <p className="legend">
           <span className="key free" /> bo'sh <span className="key busy" /> band <span className="key off" /> ta'mirda <Icon name="crown" /> VIP, yopiq <AccessSign small /> nogironlar uchun, bepul
         </p>
-        <InsideList spots={spots} now={now} tariff={tariff} onPick={goTo} />
+        <InsideList spots={spots} now={now} tariff={tariff} stolenPlates={stolenPlates} onPick={goTo} />
       </section>
 
       <aside className="dock">
@@ -625,13 +646,27 @@ export default function GuardPanel({ spots, tariff, reload, lastEvent, notify })
         </form>
 
         <Suspense fallback={<div className="gate" />}>
-          <Gate3D event={lastEvent} arrival={arrival} reject={reject} release={release} spots={view} focusZone={zone} onPlateRead={plateRead} />
+          <Gate3D inspectors={shiftNames} wanted={wantedPlates} onStolen={reportStolen} onInspect={setInspecting} event={lastEvent} arrival={arrival} reject={reject} release={release} spots={view} focusZone={zone} onPlateRead={plateRead} />
         </Suspense>
         <button className="btn ghost sm cam-demo" onClick={() => setArrival({ plate: randomPlate(), at: Date.now() })}>
           <Icon name="camera" /> Kamera oldiga mashina keldi (sinov)
         </button>
+        <div className="card inspectors-live">
+          <h3><Icon name="search" /> Tekshiruvchilar</h3>
+          {inspecting.length ? (
+            <ul>
+              {inspecting.map((c) => (
+                <li key={c.name}>
+                  <b>{c.name}</b>
+                  <span>{c.label ? (c.phase === 'check' ? c.label + ' ni tekshirmoqda' : c.label + ' tomon ketmoqda') : 'aylanib yuribdi'}</span>
+                  <small className="muted">{c.level + 1}-qavat</small>
+                </li>
+              ))}
+            </ul>
+          ) : <p className="muted small">Smenada tekshiruvchi yo'q. Admin «Xavfsizlik» bo'limida smenaga qo'yadi.</p>}
+        </div>
         <button className={`btn ghost sm cam-demo${auto ? ' on' : ''}`} onClick={() => setAuto((v) => !v)} aria-pressed={auto}>
-          {auto ? 'Avtomatik oqim: yoqilgan (har daqiqada 3 kirish, 1 chiqish)' : "Avtomatik oqim: o'chirilgan"}
+          {auto ? "Avtomatik oqim: har daqiqada 3 kirish; 85% to'lsa birma-bir chiqadi" : "Avtomatik oqim: o'chirilgan"}
         </button>
 
         {arrived && (
