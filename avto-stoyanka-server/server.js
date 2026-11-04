@@ -9,9 +9,13 @@ import { seed } from './seed.js';
 
 const pool = new pg.Pool({
   connectionString: process.env.DATABASE_URL,
-  max: Number(process.env.PG_POOL_MAX) || 10, // lokal PGlite bitta ulanishni ko'taradi: PG_POOL_MAX=1
+  // Lokal PGlite (PG_POOL_MAX=1): bitta ulanish va u hech yopilmaydi — qayta ulanishda PGlite qotib qoladi
+  max: Number(process.env.PG_POOL_MAX) || 10,
+  idleTimeoutMillis: process.env.PG_POOL_MAX ? 0 : 10000,
 });
 const app = express();
+// Ochiq sayt (stayanka.vercel.app) shu kompyuterdagi serverga murojaat qilsa, Chrome shu ruxsatni so'raydi
+app.use((req, res, next) => (res.set('Access-Control-Allow-Private-Network', 'true'), next()));
 app.use(cors());
 app.use(express.json());
 

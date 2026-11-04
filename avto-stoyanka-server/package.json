@@ -7,11 +7,17 @@
     "start": "node --env-file-if-exists=.env server.js",
     "init-db": "node --env-file-if-exists=.env init-db.js",
     "test": "node --test",
-    "demo": "node --env-file-if-exists=.env demo-data.js"
+    "demo": "node --env-file-if-exists=.env demo-data.js",
+    "local": "pglite-server --db=./.pgdata --port=5433 --max-connections=4 --run=\"node --env-file-if-exists=.env server.js\"",
+    "local:init-db": "pglite-server --db=./.pgdata --port=5433 --run=\"node --env-file-if-exists=.env init-db.js\""
   },
   "dependencies": {
     "cors": "^2.8.6",
     "express": "^5.3.0",
     "pg": "^8.23.1"
+  },
+  "devDependencies": {
+    "@electric-sql/pglite": "^0.5.14",
+    "@electric-sql/pglite-socket": "^0.2.17"
   }
 }

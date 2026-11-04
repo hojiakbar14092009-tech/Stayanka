@@ -251,4 +251,7 @@ Doimiy ishlashi uchun server va baza bulutda turadi:
 
 Bepul Render 15 daqiqa so'rov bo'lmasa uxlaydi; birinchi so'rovda ~1 daqiqada uyg'onadi (kirish sahifasi shu vaqt
 "server javob bermayapti" deb qayta tekshirib turadi).
-Lokal PGlite bitta ulanishni ko'taradi: `.env` da `PG_POOL_MAX=1` (aks holda `ECONNRESET` → "Serverda xato").
+**Lokal ishga tushirish (Postgres o'rnatmasdan):** `avto-stoyanka-server` da `npm run local` — PGlite bazasi (`.pgdata/`) va server birga ko'tariladi;
+bazani tozadan yaratish: `npm run local:init-db`. `.env` da `PG_POOL_MAX=1` bo'lishi shart: PGlite bitta ulanishda ishlaydi,
+ulanish yopilib qayta ochilsa qotib qoladi (login va so'rovlar javobsiz qoladi, "Serverda xato").
+Vercel'dagi sayt shu kompyuterdagi serverga ulanganda Chrome "mahalliy tarmoqqa kirish" ruxsatini so'rashi mumkin — Ruxsat berish.
