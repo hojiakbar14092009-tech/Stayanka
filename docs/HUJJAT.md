@@ -284,3 +284,11 @@ Vercel'dagi sayt shu kompyuterdagi serverga ulanganda Chrome "mahalliy tarmoqqa 
 
 - 3D sahnada sichqoncha: chap tugma — aylantirish, o'ng tugma — siljitish, g'ildirak — yaqinlashtirish; sahna tanlansa strelkalar bilan siljitish.
 - Tegilgan zahoti avtomatik kamera to'xtaydi, o'ng yuqorida «Avtomatik kamera» tugmasi chiqadi; 45 soniya tegilmasa o'zi qaytadi.
+
+## 21. Hashamatli binolar va butiklar (3D)
+
+- Shahar bo'ylab 28 ta qimmat minora: shimolda garaj va mall ortidagi sayr xiyoboni (daraxt, chiroq) bo'ylab 10 ta,
+  mall sharqida katta yo'l bo'yida 3 ta, darvozaning g'arbida, arena g'arbida va ikkinchi garaj janubida qolganlari.
+- Har binoning pastki qavati — 3 ta butik: iliq yorug' vitrina (manekenlar, sumkalar, eshik), nomli peshtoq
+  (LUMIÈRE, ZARAFSHON, OLTIN IPAK, SAMARQAND SILK, AURUM ... — o'ylab topilgan nomlar), rangli soyabon, gul tuvaklar, oltin karniz.
+- Minora shakllari: oltin tojli va shpilli shisha, oltin halqali oq silindr, zinapoyasimon tosh (mansard tom), burama shisha.

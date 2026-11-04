@@ -528,7 +528,7 @@ function buildBooth(scene) {
 
 function buildWorld(scene, gate) {
   // Asfalt, maysa, trotuarlar
-  const ground = mesh(new THREE.PlaneGeometry(420, 280), new THREE.MeshStandardMaterial({ map: grassTex([84, 56]), roughness: 1 }), { x: 80, z: 0, shadow: false });
+  const ground = mesh(new THREE.PlaneGeometry(900, 700), new THREE.MeshStandardMaterial({ map: grassTex([180, 140]), roughness: 1 }), { x: 80, z: 0, shadow: false });
   ground.rotation.x = -Math.PI / 2;
   scene.add(ground);
   const road = mesh(new THREE.BoxGeometry(260, 0.02, ROAD_EDGE * 2), new THREE.MeshStandardMaterial({ map: asphaltTex([65, 2.4]), roughness: 0.92 }), { x: 80, y: 0.01, shadow: false });
@@ -566,11 +566,11 @@ function buildWorld(scene, gate) {
   let seed = 1;
   for (const z of [-ROAD_EDGE - 3.4, ROAD_EDGE + 3.4]) {
     for (let x = -20; x <= 208; x += 4.2) {
-      if (z < 0 && (Math.abs(x - 0.5) < 2 || x > 5)) continue; // budka ro'parasi va to'xtash maydoni ochiq
-      if (z > 0 && (x > 128 || (x > -10 && x < 80))) continue; // ikkinchi garaj oldi, darvoza kamerasi va Humo Arena oldi ochiq
+      if (z < 0 && (Math.abs(x - 0.5) < 2 || x > 5 || x < -6)) continue; // budka ro'parasi, to'xtash maydoni va binolar oldi ochiq
+      if (z > 0 && (x > 128 || x < 80)) continue; // ikkinchi garaj oldi, darvoza kamerasi va Humo Arena oldi ochiq
       scene.add(buildTree(x + Math.sin(seed) * 0.6, z + Math.cos(seed) * 0.4, 0.95 + (seed % 3) * 0.12, seed++));
     }
-    for (let x = -19; x <= 127; x += 2.1) if ((z > 0 && Math.abs(x - 84) > 3.5 && (x < 22 || x > 79)) || x < 6) scene.add(buildBush(x, z > 0 ? z - 1.2 : z + 1.2, 0.8 + (seed % 2) * 0.2, seed++));
+    for (let x = -19; x <= 127; x += 2.1) if ((z > 0 && Math.abs(x - 84) > 3.5 && ((x > -6 && x < 22) || x > 79)) || (z < 0 && x > -6 && x < 6)) scene.add(buildBush(x, z > 0 ? z - 1.2 : z + 1.2, 0.8 + (seed % 2) * 0.2, seed++));
   }
   for (const x of [-5.2, 6.2]) gate.add(buildBush(x, 0, 1, seed++)); // orolchadagi gulzor
   // Ko'cha chiroqlari ikki tomonda
@@ -1023,6 +1023,222 @@ function fillGarage(gar) {
     }
   }
   gar.drawBoard(free);
+}
+
+// ---------- Hashamatli minoralar: pastki qavatida butiklar — vitrina, peshtoq, soyabon, gul tuvaklar; tepasi har xil shakl ----------
+const BOUTIQUES = ['LUMIÈRE', 'NOIR & OR', 'ZARAFSHON', 'OLTIN IPAK', 'MAISON ARAL', 'VELOUR', 'SAMARQAND SILK', 'ATELIER 7', 'ÉCLAT', 'REGALIA',
+  'AURUM', 'BELLE RIVE', 'SOIE', 'ONYX', 'MARQUIS', 'IVORY', 'CRYSTAL', 'TOSHKENT JEWELS', 'DIAMANT', 'SAFFRON'];
+const SIGN_STYLES = [['#111214', '#e8c66a'], ['#0f2a22', '#f4efe3'], ['#f4efe3', '#1a1a1a'], ['#2a1430', '#f2d28a'], ['#14213d', '#ffffff']];
+// [markaz x, z, burilish (old tomoni shu yo'nalishga qaraydi), balandlik ko'paytmasi]
+const LUXURY_SITES = [
+  ...Array.from({ length: 10 }, (_, k) => [-42 + k * 28, -66, 0, 1.25]), // shimoliy sayr xiyoboni
+  [136, -18, 0, 1], [164, -18, 0, 1.1], [192, -18, 0, 0.9], // mall sharqi, katta yo'l bo'yida
+  [-20, -18, 0, 0.8], [-48, -18, 0, 1], // darvozaning g'arbi
+  [-20, 18, Math.PI, 0.8], [-48, 18, Math.PI, 1], [-20, 52, Math.PI, 1.1], [-48, 52, Math.PI, 0.9], [-20, 86, Math.PI, 1], [-48, 86, Math.PI, 1.2],
+  [204, 18, Math.PI, 0.9], [150, 50, Math.PI, 1], [176, 50, Math.PI, 1.2], [202, 50, Math.PI, 0.9], [150, 84, Math.PI, 1.1], [176, 84, Math.PI, 0.9], [202, 84, Math.PI, 1.3],
+];
+
+function buildLuxury(scene) {
+  // fasad teksturalari: 1 plitka = 2 oyna eni, 1 qavat bo'yi
+  const facade = {
+    glass: canvasTex(256, 256, (c, w, h) => {
+      c.fillStyle = '#1b2838';
+      c.fillRect(0, 0, w, h);
+      for (let b = 0; b < 2; b++) {
+        const g = c.createLinearGradient(0, 0, 0, h);
+        g.addColorStop(0, '#5f7fa3');
+        g.addColorStop(1, '#22344b');
+        c.fillStyle = Math.random() < 0.22 ? '#f3d9a4' : g;
+        c.fillRect(b * 128 + 6, 10, 116, h - 20);
+      }
+      c.fillStyle = '#c9a24a';
+      c.fillRect(0, 0, w, 6);
+      c.fillRect(126, 0, 4, h);
+    }),
+    stone: canvasTex(256, 256, (c, w, h) => {
+      c.fillStyle = '#e9dfcc';
+      c.fillRect(0, 0, w, h);
+      for (let b = 0; b < 2; b++) {
+        c.fillStyle = '#cbbd9f';
+        c.fillRect(b * 128 + 26, 30, 76, 196);
+        c.fillStyle = Math.random() < 0.2 ? '#f0d49c' : '#2b3644';
+        c.fillRect(b * 128 + 32, 36, 64, 184);
+        c.fillStyle = '#20242a';
+        c.fillRect(b * 128 + 22, 214, 84, 8); // balkon panjarasi
+      }
+      c.fillStyle = '#d8cbb1';
+      c.fillRect(0, 0, w, 10);
+    }),
+    white: canvasTex(256, 256, (c, w, h) => {
+      c.fillStyle = '#f4f3ef';
+      c.fillRect(0, 0, w, h);
+      for (let b = 0; b < 4; b++) {
+        c.fillStyle = Math.random() < 0.15 ? '#f6dca8' : '#7fa4c6';
+        c.fillRect(b * 64 + 10, 14, 44, h - 28);
+      }
+    }),
+  };
+  const facadeMat = (kind, w, h) => {
+    const t = facade[kind].clone();
+    t.repeat.set(Math.max(1, Math.round(w / 7)), Math.max(1, Math.round(h / 3.6)));
+    t.needsUpdate = true;
+    return new THREE.MeshStandardMaterial({ map: t, roughness: kind === 'glass' ? 0.2 : 0.65, metalness: kind === 'glass' ? 0.55 : 0.05 });
+  };
+  // vitrina: iliq yorug'lik, chiroqlar, manekenlar, javonda sumkalar, eshik
+  const shopTex = canvasTex(512, 320, (c, w, h) => {
+    const g = c.createLinearGradient(0, 0, 0, h);
+    g.addColorStop(0, '#4a3524');
+    g.addColorStop(1, '#f1d7a6');
+    c.fillStyle = g;
+    c.fillRect(0, 0, w, h);
+    for (const x of [90, 250, 410]) {
+      const r = c.createRadialGradient(x, 40, 4, x, 120, 150);
+      r.addColorStop(0, 'rgba(255,244,214,.9)');
+      r.addColorStop(1, 'rgba(255,244,214,0)');
+      c.fillStyle = r;
+      c.fillRect(0, 0, w, h);
+    }
+    const dresses = ['#1a1a1a', '#8a1f2b', '#e8e2d6', '#1f3a5f'];
+    [70, 150, 330].forEach((x, i) => {
+      c.fillStyle = '#d9cbb5';
+      c.beginPath();
+      c.arc(x, 120, 13, 0, Math.PI * 2);
+      c.fill();
+      c.fillStyle = dresses[i % 4];
+      c.beginPath();
+      c.moveTo(x - 16, 138);
+      c.lineTo(x + 16, 138);
+      c.lineTo(x + 34, 270);
+      c.lineTo(x - 34, 270);
+      c.closePath();
+      c.fill();
+    });
+    c.fillStyle = '#6b4a2f';
+    c.fillRect(395, 200, 100, 6);
+    ['#b8860b', '#7a1f2b', '#1a1a1a', '#e8e2d6'].forEach((col, i) => {
+      c.fillStyle = col;
+      c.fillRect(400 + i * 24, 178, 18, 22);
+    });
+    c.fillStyle = 'rgba(20,22,26,.85)';
+    c.fillRect(220, 110, 70, 210); // eshik
+    c.fillStyle = '#c9a24a';
+    c.fillRect(280, 210, 4, 30);
+    c.fillStyle = 'rgba(255,255,255,.18)';
+    c.fillRect(0, 0, w, 8);
+  });
+  shopTex.wrapS = shopTex.wrapT = THREE.ClampToEdgeWrapping;
+  const windowMat = new THREE.MeshStandardMaterial({ map: shopTex, emissive: 0xffffff, emissiveMap: shopTex, emissiveIntensity: 0.55, roughness: 0.15, metalness: 0.2 });
+  const signCache = new Map();
+  const signMat = (name, [bg, fg]) => {
+    const key = name + bg;
+    if (!signCache.has(key)) {
+      const t = canvasTex(512, 96, (c, w, h) => {
+        c.fillStyle = bg;
+        c.fillRect(0, 0, w, h);
+        c.strokeStyle = fg;
+        c.lineWidth = 3;
+        c.strokeRect(6, 6, w - 12, h - 12);
+        c.fillStyle = fg;
+        c.font = 'bold 50px Georgia, serif';
+        c.textAlign = 'center';
+        c.textBaseline = 'middle';
+        c.fillText(name.split('').join(' '), w / 2, h / 2 + 3);
+      });
+      t.wrapS = t.wrapT = THREE.ClampToEdgeWrapping;
+      signCache.set(key, new THREE.MeshStandardMaterial({ map: t, emissive: 0xffffff, emissiveMap: t, emissiveIntensity: 0.4 }));
+    }
+    return signCache.get(key);
+  };
+  const stone = mat(0xe4dac6, { roughness: 0.6 });
+  const darkStone = mat(0x2a2c31, { roughness: 0.45, metalness: 0.2 });
+  const gold = mat(0xc9a24a, { metalness: 0.85, roughness: 0.28 });
+  const frame = mat(0x15171a, { metalness: 0.6, roughness: 0.3 });
+  const awnings = [0x14213d, 0x7a1f2b, 0x0f2a22, 0x1a1a1a].map((c) => mat(c, { roughness: 0.6 }));
+  const planter = mat(0x3a3d42, { roughness: 0.5 });
+  const topiary = mat(0x3f6a32, { roughness: 0.9 });
+  const paving = new THREE.MeshStandardMaterial({ map: tileTex([8, 1.5]), roughness: 0.8 });
+  const postGeo = new THREE.BoxGeometry(0.2, 3.7, 0.25);
+  const planterGeo = new THREE.BoxGeometry(0.6, 0.6, 0.6);
+  const topiaryGeo = new THREE.SphereGeometry(0.4, 12, 8);
+
+  LUXURY_SITES.forEach(([x, z, ry, hk], i) => {
+    const r = (k) => (Math.sin(i * 91.7 + k * 13.1) + 1) / 2; // tasodifiy, lekin har ochilishda bir xil
+    const g = new THREE.Group();
+    g.position.set(x, 0, z);
+    g.rotation.y = ry;
+    scene.add(g);
+    const W = 20 + Math.round(r(1) * 5);
+    const D = 15;
+    const PH = 5.2;
+    const front = D / 2;
+    // podium: tosh, oltin karniz, qora sokol
+    g.add(box(W, PH, D, i % 3 === 1 ? darkStone : stone, { y: PH / 2 }));
+    g.add(box(W + 0.5, 0.35, D + 0.5, gold, { y: PH + 0.17 }));
+    g.add(box(W + 0.1, 0.5, D + 0.1, darkStone, { y: 0.25, shadow: false }));
+    g.add(box(W + 3, 0.08, 3.4, paving, { y: 0.04, z: front + 1.7, shadow: false }));
+    // 3 ta butik
+    const sw = (W - 1) / 3;
+    for (let k = 0; k <= 3; k++) g.add(mesh(postGeo, frame, { x: -W / 2 + 0.5 + sw * k, y: 1.85, z: front + 0.1, shadow: false }));
+    g.add(box(W - 0.6, 0.25, 0.3, frame, { y: 3.75, z: front + 0.1, shadow: false }));
+    for (let k = 0; k < 3; k++) {
+      const sx = -W / 2 + 0.5 + sw * (k + 0.5);
+      g.add(mesh(new THREE.PlaneGeometry(sw - 0.3, 3.4), windowMat, { x: sx, y: 1.95, z: front + 0.03, shadow: false }));
+      g.add(mesh(new THREE.PlaneGeometry(sw - 0.9, 0.78), signMat(BOUTIQUES[(i * 3 + k) % BOUTIQUES.length], SIGN_STYLES[(i + k) % SIGN_STYLES.length]), { x: sx, y: 4.45, z: front + 0.05, shadow: false }));
+      const aw = box(sw - 0.5, 0.06, 1.4, awnings[(i + k) % 4], { x: sx, y: 3.65, z: front + 0.75, shadow: false });
+      aw.rotation.x = 0.3;
+      g.add(aw);
+    }
+    for (let k = 0; k <= 3; k++) {
+      const px = -W / 2 + 0.5 + sw * k;
+      g.add(mesh(planterGeo, planter, { x: px, y: 0.3, z: front + 0.9, shadow: false }), mesh(topiaryGeo, topiary, { x: px, y: 0.98, z: front + 0.9, shadow: false }));
+    }
+    // minora
+    const H = Math.round((26 + r(2) * 40) * hk);
+    const tw = W * 0.74;
+    const td = D * 0.74;
+    const y0 = PH + 0.35;
+    const type = i % 4;
+    if (type === 0) {
+      g.add(box(tw, H, td, facadeMat('glass', tw, H), { y: y0 + H / 2 }));
+      g.add(box(tw + 0.4, 1.3, td + 0.4, gold, { y: y0 + H + 0.65 }));
+      g.add(mesh(new THREE.CylinderGeometry(0.08, 0.3, 9, 8), gold, { y: y0 + H + 5.8 }));
+    } else if (type === 1) {
+      const R = td * 0.62;
+      g.add(mesh(new THREE.CylinderGeometry(R, R, H, 40), facadeMat('white', 2 * Math.PI * R, H), { y: y0 + H / 2 }));
+      for (let yy = 12; yy < H; yy += 12) g.add(mesh(new THREE.CylinderGeometry(R + 0.18, R + 0.18, 0.35, 40), gold, { y: y0 + yy, shadow: false }));
+      const cap = mesh(new THREE.SphereGeometry(R, 32, 12, 0, Math.PI * 2, 0, Math.PI / 2), mat(0x9fc3e0, { metalness: 0.7, roughness: 0.15 }), { y: y0 + H });
+      cap.scale.y = 0.45;
+      g.add(cap);
+    } else if (type === 2) {
+      let yy = y0;
+      [[1, 0.5], [0.8, 0.3], [0.6, 0.2]].forEach(([k, f]) => {
+        const hh = H * f;
+        g.add(box(tw * k, hh, td * k, facadeMat('stone', tw * k, hh), { y: yy + hh / 2 }));
+        yy += hh;
+        g.add(box(tw * k + 0.5, 0.4, td * k + 0.5, gold, { y: yy + 0.2, shadow: false }));
+      });
+      const roof = mesh(new THREE.ConeGeometry(tw * 0.42, 4, 4), mat(0x3f5a6b, { metalness: 0.6, roughness: 0.35 }), { y: yy + 2.4 });
+      roof.rotation.y = Math.PI / 4;
+      g.add(roof);
+    } else {
+      const floors = Math.round(H / 3.6);
+      const slabs = new THREE.InstancedMesh(new THREE.BoxGeometry(tw * 0.92, 3.5, td * 0.92), facadeMat('glass', tw, 3.6), floors);
+      const m4 = new THREE.Matrix4();
+      for (let f = 0; f < floors; f++) slabs.setMatrixAt(f, m4.makeRotationY((f * 3.2 * Math.PI) / 180).setPosition(0, y0 + 1.75 + f * 3.6, 0));
+      slabs.castShadow = true;
+      g.add(slabs);
+      g.add(mesh(new THREE.TorusGeometry(td * 0.5, 0.12, 8, 48), gold, { y: y0 + floors * 3.6 + 0.4, shadow: false }));
+      g.children.at(-1).rotation.x = Math.PI / 2;
+    }
+  });
+
+  // shimoliy sayr xiyoboni: plitka, daraxtlar va chiroqlar butiklar qatori oldida
+  scene.add(mesh(new THREE.BoxGeometry(272, 0.05, 6), new THREE.MeshStandardMaterial({ map: tileTex([90, 2]), roughness: 0.85 }), { x: 84, y: 0.03, z: -54.5, shadow: false }));
+  let seed = 500;
+  for (let x = -50; x <= 214; x += 14) {
+    scene.add(buildTree(x, -51, 0.9, seed++));
+    buildLamp(scene, x + 7, -51.2, 1, false);
+  }
 }
 
 // ---------- Savdo markazi: egri shisha fasad, to'lqinli tom-soyabon, burama minora ----------
@@ -1728,6 +1944,7 @@ export default function Gate3D({ lot = 1, event, arrival, reject, release, spots
     const walkers = buildWalkers(city);
     const park = buildPark(city);
     const arena = buildArena(city);
+    buildLuxury(city);
     // Boshqa stoyankaning garaji (bezak): 1-stoyankada — park yonida, 2-stoyankada — mall yonida
     const garage2Root = new THREE.Group();
     if (lot !== 2) {
