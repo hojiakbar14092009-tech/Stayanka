@@ -337,3 +337,5 @@ Vercel'dagi sayt shu kompyuterdagi serverga ulanganda Chrome "mahalliy tarmoqqa 
 - **Tepa panel:** Novikov restorani fasadi (oltin chiziqlar, kamar derazalar, fonarlar), peshtoqda NOVIKOV — ikkinchi «O» rul g'ildiragi.
   Past kontrastda, o'ng tomonda: raqam va yozuvlarga xalaqit bermaydi. LED raqamlar o'zgarganda yumshoq siljib almashadi.
 - **Mini-xarita:** bo'sh joy — chiziqli bo'sh katak, band — yonib turgan qizil, nogironlar — ko'k chiziq (yashil yo'q).
+- **Ranglar (yangilandi):** band joy — muz-moviy (`--occupied`, joy sensori chirog'i kabi): mini-xarita, rejadagi joy, tablodagi «band».
+  Qizil faqat o'g'irlangan mashina uchun: zona mini-xaritasida qizil katak urib turadi (1,1 s), zona kartasi qizil hoshiyada.

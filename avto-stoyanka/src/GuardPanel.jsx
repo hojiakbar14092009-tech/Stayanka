@@ -353,11 +353,11 @@ function LotMap({ spots, selectedId, foundIds, checking, stolenPlates, onPick })
 }
 
 // Zona tabida 40 ta nuqtali mini-xarita: hamma bloklar bir qarashda, topilgan mashina yonadi
-function MiniMap({ list, foundIds }) {
+function MiniMap({ list, foundIds, stolen }) {
   return (
     <span className="mini" aria-hidden="true">
       {list.map((s) => (
-        <i key={s.id} className={foundIds.has(s.id) ? 'hit' : s.is_disabled ? 'off' : s.is_busy ? 'busy' : s.is_accessible ? 'acc' : ''} />
+        <i key={s.id} className={foundIds.has(s.id) ? 'hit' : s.is_busy && stolen.has(s.plate) ? 'stolen' : s.is_disabled ? 'off' : s.is_busy ? 'busy' : s.is_accessible ? 'acc' : ''} />
       ))}
     </span>
   );
@@ -597,11 +597,11 @@ export default function GuardPanel({ security, spots, tariff, reload, lastEvent,
             const free = list.filter((s) => !s.is_busy && !s.is_disabled).length;
             const hits = list.filter((s) => foundIds.has(s.id)).length;
             return (
-              <button key={z} className={`zone-tab${z === zone ? ' on' : ''}${list[0]?.is_premium ? ' premium' : ''}${hits ? ' has-hit' : ''}`} onClick={() => setZone(z)} aria-pressed={z === zone}>
+              <button key={z} className={`zone-tab${z === zone ? ' on' : ''}${list[0]?.is_premium ? ' premium' : ''}${hits ? ' has-hit' : ''}${list.some((s) => s.is_busy && stolenPlates.has(s.plate)) ? ' has-stolen' : ''}`} onClick={() => setZone(z)} aria-pressed={z === zone}>
                 <b>{z}</b>
                 <span>{z === 'A' ? <><Icon name="crown" size="1em" /> VIP</> : `Zona ${z}`}</span>
                 <em>{hits ? `${hits} ta topildi` : `${free} bo'sh`}</em>
-                <MiniMap list={list} foundIds={foundIds} />
+                <MiniMap list={list} foundIds={foundIds} stolen={stolenPlates} />
               </button>
             );
           })}

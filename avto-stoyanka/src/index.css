@@ -9,6 +9,7 @@
   --blue: #2257d6;
   --red: #e5484d;
   --green: #2fb679;
+  --occupied: #3ee6ff; /* band joy — joy sensoridagi muz-moviy chiroq; qizil faqat o'g'irlangan uchun */
   --led: #ffb21e; /* stoyanka tablosining qahrabo LED rangi — "bo'sh" va "tayyor" belgisi */
   --concrete: #4a4d52;
   --display: 'Barlow Condensed', 'Arial Narrow', sans-serif;
@@ -170,8 +171,8 @@ label { display: grid; gap: .3rem; font-size: .9rem; color: var(--paint-dim); }
 }
 .stall.free:hover { background: rgba(47, 182, 121, .1); }
 .stall.free:hover::after { transform: scale(1.15); }
-.stall.busy { background: rgba(229, 72, 77, .13); }
-.stall.busy:hover { background: rgba(229, 72, 77, .22); }
+.stall.busy { background: rgba(62, 230, 255, .08); }
+.stall.busy:hover { background: rgba(62, 230, 255, .15); }
 .stall.off { background: repeating-linear-gradient(45deg, rgba(242, 194, 48, .35) 0 6px, transparent 6px 14px); }
 
 .car { width: 42px; height: 76px; filter: drop-shadow(0 4px 3px rgba(0, 0, 0, .45)); animation: park-in .7s cubic-bezier(.2, .8, .3, 1); }
@@ -192,7 +193,7 @@ label { display: grid; gap: .3rem; font-size: .9rem; color: var(--paint-dim); }
 .legend { display: flex; flex-wrap: wrap; align-items: center; gap: .4rem .9rem; color: var(--paint-dim); font-size: .9rem; }
 .key { display: inline-block; width: 14px; height: 14px; border-radius: 3px; margin-right: -.5rem; vertical-align: -2px; }
 .key.free { border: 3px solid var(--led); border-radius: 50%; }
-.key.busy { background: var(--red); }
+.key.busy { background: var(--occupied); }
 .key.off { background: repeating-linear-gradient(45deg, var(--yellow) 0 3px, transparent 3px 6px); }
 .key.premium { border: 3px solid var(--yellow); border-top: 0; border-radius: 0; }
 
@@ -347,7 +348,7 @@ label { display: grid; gap: .3rem; font-size: .9rem; color: var(--paint-dim); }
 /* ---------- Zona tabidagi mini-xarita ---------- */
 .mini { grid-column: 1 / -1; display: grid; grid-template-columns: repeat(10, 1fr); gap: 2px; margin-top: .45rem; }
 .mini i { aspect-ratio: 1; border-radius: 1px; background: #17191c; box-shadow: inset 0 0 0 1px rgba(236, 234, 228, .3); }
-.mini i.busy { background: #ff4a3d; box-shadow: 0 0 4px rgba(255, 74, 61, .8); }
+.mini i.busy { background: var(--occupied); box-shadow: 0 0 4px rgba(62, 230, 255, .7); }
 .mini i.off { background: var(--yellow); opacity: .5; }
 .mini i.hit { background: var(--yellow); box-shadow: 0 0 6px var(--yellow); animation: blink .8s steps(2) infinite; }
 .zone-tab.has-hit { border-color: var(--yellow); }
@@ -795,8 +796,8 @@ label { display: grid; gap: .3rem; font-size: .9rem; color: var(--paint-dim); }
 }
 .stall.down .stall-tag { top: -9px; }
 .stall.up .stall-tag { bottom: -9px; }
-.stall-tag i { width: 7px; height: 7px; border-radius: 50%; background: #2fb679; box-shadow: 0 0 6px #2fb679; }
-.stall-tag.busy i { background: #e5484d; box-shadow: 0 0 6px #e5484d; }
+.stall-tag i { width: 7px; height: 7px; border-radius: 50%; background: var(--led); box-shadow: 0 0 6px var(--led); }
+.stall-tag.busy i { background: var(--occupied); box-shadow: 0 0 6px var(--occupied); }
 .stall-tag.off i { background: #f2c230; box-shadow: 0 0 6px #f2c230; }
 .stall-tag.acc.free i { background: #3b7bff; box-shadow: 0 0 6px #3b7bff; }
 .stall.premium .stall-tag { border-color: rgba(242, 194, 48, .7); color: #fff3c2; }
@@ -851,7 +852,7 @@ label { display: grid; gap: .3rem; font-size: .9rem; color: var(--paint-dim); }
 .board b { font: 400 1.9rem/1.05 'DotGothic16', ui-monospace, monospace; letter-spacing: .04em; }
 .board small { font: 600 .75rem var(--display); color: #8b8d90; letter-spacing: .04em; }
 .board .free b { color: var(--led); text-shadow: 0 0 6px rgba(255, 178, 30, .75), 0 0 16px rgba(255, 178, 30, .3); }
-.board .busy b { color: #ff4a3d; text-shadow: 0 0 6px rgba(255, 74, 61, .7), 0 0 16px rgba(255, 74, 61, .3); }
+.board .busy b { color: var(--occupied); text-shadow: 0 0 6px rgba(62, 230, 255, .7), 0 0 16px rgba(62, 230, 255, .3); }
 .board .cash b { color: #e9e6dc; text-shadow: 0 0 6px rgba(233, 230, 220, .45); }
 
 /* Tekshiruvchilar va o'g'irlangan mashinalar */
@@ -910,3 +911,12 @@ label { display: grid; gap: .3rem; font-size: .9rem; color: var(--paint-dim); }
 @keyframes led-in { from { transform: translateY(60%); opacity: 0; filter: blur(1.5px); } }
 @keyframes led-out { to { transform: translateY(-60%); opacity: 0; filter: blur(1.5px); } }
 @media (prefers-reduced-motion: reduce) { .led-new, .led-old { animation: none; } .led-old { display: none; } }
+
+/* O'g'irlangan mashina: zona mini-xaritasida qizil katak urib turadi, zona kartasi qizil hoshiyada */
+.mini i.stolen { position: relative; z-index: 1; background: #ff1f2d; animation: stolen-pulse 1.1s ease-in-out infinite; }
+@keyframes stolen-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(255, 31, 45, .7); transform: scale(1); }
+  50% { box-shadow: 0 0 0 3px rgba(255, 31, 45, .25), 0 0 9px 2px rgba(255, 31, 45, .85); transform: scale(1.3); }
+}
+.zone-tab.has-stolen { box-shadow: inset 0 0 0 2px #c2141b; }
+@media (prefers-reduced-motion: reduce) { .mini i.stolen { animation: none; box-shadow: 0 0 0 2px #fff; } }
