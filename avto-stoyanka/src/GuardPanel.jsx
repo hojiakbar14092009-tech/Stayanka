@@ -320,7 +320,7 @@ function MiniMap({ list, foundIds }) {
   );
 }
 
-let lastAuto = Date.now() - 55000; // birinchi avtomatik qadam panel ochilgandan ~5 soniyadan keyin
+let lastAuto = Date.now() - 115000; // birinchi avtomatik qadam panel ochilgandan ~5 soniyadan keyin
 
 export default function GuardPanel({ spots, tariff, reload, lastEvent, notify }) {
   const [zone, setZone] = useState('B');
@@ -343,7 +343,7 @@ export default function GuardPanel({ spots, tariff, reload, lastEvent, notify })
   const [arrivePremium, setArrivePremium] = useState(false);
   const [arriveDisabled, setArriveDisabled] = useState(false);
   const plateInput = useRef(null);
-  // Avtomatik oqim: har daqiqada bitta mashina cheki skanerlanib chiqadi, bitta mashina kelib chek oladi — hammasi ekranda
+  // Avtomatik oqim: har 2 daqiqada bitta mashina cheki skanerlanib chiqadi, bitta mashina kelib chek oladi — hammasi ekranda
   const [auto, setAuto] = useState(true);
   const autoOut = useRef(false); // ochiq skaner/chiqish cheki avtomatik oqimniki
   const autoIn = useRef(false); // darvozadagi mashina avtomatik oqimniki
@@ -408,7 +408,7 @@ export default function GuardPanel({ spots, tariff, reload, lastEvent, notify })
     const tick = () => {
       const { ticket, scanning, receipt, arrived, view } = live.current;
       // Qorovul o'zi ishlayapti — keyinroq. Oxirgi qadam vaqti modulda: panel qayta ochilsa ham daqiqada bittadan oshmaydi
-      if (ticket || scanning || receipt || arrived || Date.now() - lastAuto < 60000) return;
+      if (ticket || scanning || receipt || arrived || Date.now() - lastAuto < 120000) return;
       lastAuto = Date.now();
       const parked = view.filter((x) => x.is_busy && x.ticket_no);
       const out = parked[Math.floor(Math.random() * parked.length)];
@@ -587,7 +587,7 @@ export default function GuardPanel({ spots, tariff, reload, lastEvent, notify })
           <Icon name="camera" /> Kamera oldiga mashina keldi (sinov)
         </button>
         <button className={`btn ghost sm cam-demo${auto ? ' on' : ''}`} onClick={() => setAuto((v) => !v)} aria-pressed={auto}>
-          {auto ? "Avtomatik oqim: yoqilgan (har daqiqada 1 kirish, 1 chiqish)" : "Avtomatik oqim: o'chirilgan"}
+          {auto ? "Avtomatik oqim: yoqilgan (har 2 daqiqada 1 kirish, 1 chiqish)" : "Avtomatik oqim: o'chirilgan"}
         </button>
 
         {arrived && (

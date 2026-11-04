@@ -37,12 +37,9 @@ const HELIX = { x: 52.6, z: -16.9, r: 3.9 }; // yuqoriga chiqish rampasi
 const HELIX_DOWN = { x: 6, z: -16.9, r: 3.9 }; // pastga tushish rampasi (chiqish yo'liga yaqin)
 // Kamera: darvoza ko'rinishi va bo'sh paytdagi sayr nuqtalari [qaraladigan nuqta, kamera siljishi]
 const GATE_VIEW = [new THREE.Vector3(13, 2.6, -9.5), new THREE.Vector3(-19, 16, 27)];
-const TOUR = [
-  GATE_VIEW,
-  [new THREE.Vector3(52, 4, -14), new THREE.Vector3(-24, 20, 38)],
-  [new THREE.Vector3(84, 7, 25), new THREE.Vector3(-16, 22, -40)],
-  [new THREE.Vector3(52, 4, -14), new THREE.Vector3(-24, 20, 38)],
-];
+// Bo'sh payt: o'rtadan umumiy ko'rinish — garaj, mall, Humo Arena, park va ikkinchi garaj bir kadrda
+const OVERVIEW = [new THREE.Vector3(98, 0, 6), new THREE.Vector3(0, 104, 128)];
+const Y_AXIS = new THREE.Vector3(0, 1, 0);
 
 // "B-07" → 3D joy: qavat, koordinata, qaysi yo'lakdan kiriladi, mashina qaysi tomonga qaraydi
 function stallFor(label) {
@@ -381,12 +378,13 @@ function buildBush(x, z, s = 1, seed = 1) {
   return b;
 }
 // Ko'cha chirog'i: ustun, egilgan bo'yin, yoritgich
-function buildLamp(scene, x, z, face) {
+function buildLamp(scene, x, z, face, lit = true) {
   const metal = mat(0x50555c, { metalness: 0.7, roughness: 0.35 });
   scene.add(mesh(new THREE.CylinderGeometry(0.05, 0.08, 4.2, 10), metal, { x, y: 2.1, z }));
   scene.add(box(0.06, 0.06, 1.1, metal, { x, y: 4.2, z: z + face * 0.5 }));
   scene.add(box(0.22, 0.08, 0.42, metal, { x, y: 4.16, z: z + face * 1.05 }));
   scene.add(box(0.18, 0.02, 0.36, mat(0xfff1c8, { emissive: 0xfff1c8, emissiveIntensity: 2.5 }), { x, y: 4.11, z: z + face * 1.05, shadow: false }));
+  if (!lit) return;
   const light = new THREE.PointLight(0xffd9a0, 4, 9, 1.6);
   light.position.set(x, 4, z + face * 1.05);
   scene.add(light);
@@ -527,26 +525,26 @@ function buildBooth(scene) {
 
 function buildWorld(scene) {
   // Asfalt, maysa, trotuarlar
-  const ground = mesh(new THREE.PlaneGeometry(300, 200), new THREE.MeshStandardMaterial({ map: grassTex([60, 40]), roughness: 1 }), { x: 40, z: -15, shadow: false });
+  const ground = mesh(new THREE.PlaneGeometry(420, 280), new THREE.MeshStandardMaterial({ map: grassTex([84, 56]), roughness: 1 }), { x: 80, z: 0, shadow: false });
   ground.rotation.x = -Math.PI / 2;
   scene.add(ground);
-  const road = mesh(new THREE.BoxGeometry(180, 0.02, ROAD_EDGE * 2), new THREE.MeshStandardMaterial({ map: asphaltTex([45, 2.4]), roughness: 0.92 }), { x: 40, y: 0.01, shadow: false });
+  const road = mesh(new THREE.BoxGeometry(260, 0.02, ROAD_EDGE * 2), new THREE.MeshStandardMaterial({ map: asphaltTex([65, 2.4]), roughness: 0.92 }), { x: 80, y: 0.01, shadow: false });
   road.receiveShadow = true;
   scene.add(road);
   const white = mat(0xeceae4, { roughness: 0.8 });
   const yellow = mat(0xf2c230, { roughness: 0.7 });
   const curbMat = mat(0x8d8f93);
   const walk = (len) => new THREE.MeshStandardMaterial({ map: tileTex([len / 2, 1.1]), roughness: 0.85 });
-  scene.add(box(180, 0.16, 0.3, curbMat, { x: 40, y: 0.08, z: ROAD_EDGE + 0.15 }));
-  scene.add(box(180, 0.12, 2.2, walk(180), { x: 40, y: 0.06, z: ROAD_EDGE + 1.4 }));
+  scene.add(box(260, 0.16, 0.3, curbMat, { x: 80, y: 0.08, z: ROAD_EDGE + 0.15 }));
+  scene.add(box(260, 0.12, 2.2, walk(260), { x: 80, y: 0.06, z: ROAD_EDGE + 1.4 }));
   // -z tomonda trotuar maydon kirish yo'li (x 7,6..11) da uziladi
-  for (const [x0, x1] of [[-50, 7.6], [11, 130]]) {
+  for (const [x0, x1] of [[-50, 7.6], [11, 210]]) {
     scene.add(box(x1 - x0, 0.16, 0.3, curbMat, { x: (x0 + x1) / 2, y: 0.08, z: -ROAD_EDGE - 0.15 }));
     scene.add(box(x1 - x0, 0.12, 2.2, walk(x1 - x0), { x: (x0 + x1) / 2, y: 0.06, z: -ROAD_EDGE - 1.4 }));
   }
   // Yo'lak chiziqlari va stop chiziqlari
   for (const z of [-(ISLAND + 0.15), ISLAND + 0.15, -(ROAD_EDGE - 0.2), ROAD_EDGE - 0.2]) {
-    for (let x = -49; x < 129; x += 2) scene.add(box(1.1, 0.01, 0.1, white, { x, y: 0.022, z, shadow: false }));
+    for (let x = -49; x < 209; x += 2) scene.add(box(1.1, 0.01, 0.1, white, { x, y: 0.022, z, shadow: false }));
   }
   scene.add(box(0.3, 0.01, ROAD_EDGE - ISLAND, white, { x: -1.2, y: 0.023, z: -(ROAD_EDGE + ISLAND) / 2, shadow: false }));
   scene.add(box(0.3, 0.01, ROAD_EDGE - ISLAND, white, { x: 1.2, y: 0.023, z: (ROAD_EDGE + ISLAND) / 2, shadow: false }));
@@ -562,18 +560,26 @@ function buildWorld(scene) {
   // Daraxtlar qatori (trotuar ortida) va butalar
   let seed = 1;
   for (const z of [-ROAD_EDGE - 3.4, ROAD_EDGE + 3.4]) {
-    for (let x = -20; x <= 128; x += 4.2) {
+    for (let x = -20; x <= 208; x += 4.2) {
       if (z < 0 && (Math.abs(x - 0.5) < 2 || x > 5)) continue; // budka ro'parasi va to'xtash maydoni ochiq
+      if (z > 0 && x > 128) continue; // ikkinchi garaj oldi
       scene.add(buildTree(x + Math.sin(seed) * 0.6, z + Math.cos(seed) * 0.4, 0.95 + (seed % 3) * 0.12, seed++));
     }
-    for (let x = -19; x <= 127; x += 2.1) if (z > 0 || x < 6) scene.add(buildBush(x, z > 0 ? z - 1.2 : z + 1.2, 0.8 + (seed % 2) * 0.2, seed++));
+    for (let x = -19; x <= 127; x += 2.1) if ((z > 0 && Math.abs(x - 84) > 3.5) || x < 6) scene.add(buildBush(x, z > 0 ? z - 1.2 : z + 1.2, 0.8 + (seed % 2) * 0.2, seed++));
   }
   for (const x of [-5.2, 6.2]) scene.add(buildBush(x, 0, 1, seed++)); // orolchadagi gulzor
   // Ko'cha chiroqlari ikki tomonda
   for (const x of [-12, -4, 4]) buildLamp(scene, x, -ROAD_EDGE - 0.6, 1);
   for (const x of [6, 14, 26, 40, 54, 68, 100, 116]) buildLamp(scene, x, ROAD_EDGE + 0.6, -1); // old tomonda — kamerani to'smaydigan joylarda
+  for (const x of [134, 152, 166, 190, 204]) buildLamp(scene, x, ROAD_EDGE + 0.6, -1, false);
+  for (const x of [124, 140, 158, 176, 194]) buildLamp(scene, x, -ROAD_EDGE - 0.6, 1, false);
+  // Ikkinchi garajga kirish yo'li (park yonida) va "P" belgisi
+  scene.add(box(5.4, 0.17, 3.6, new THREE.MeshStandardMaterial({ map: asphaltTex([1.4, 1]), roughness: 0.92 }), { x: 177.1, y: 0.085, z: 6.6, shadow: false }));
+  const p2 = textTexture('P  200', { w: 256, h: 128, bg: '#2257d6', font: 'bold 80px Arial' });
+  scene.add(box(0.08, 2.8, 0.08, mat(0x8a8f96), { x: 172.6, y: 1.4, z: ROAD_EDGE + 0.6 }));
+  scene.add(mesh(new THREE.PlaneGeometry(1.8, 0.9), new THREE.MeshStandardMaterial({ map: p2 }), { x: 172.6, y: 2.85, z: ROAD_EDGE + 0.65 }));
   // Uzoqdagi binolar (shahar fon) — ortda
-  for (let i = 0; i < 26; i++) {
+  for (let i = 0; i < 36; i++) {
     const h = 12 + ((i * 37) % 7) * 3;
     const bw = 6 + (i % 3) * 2;
     const bld = mesh(new THREE.BoxGeometry(bw, h, 6), new THREE.MeshStandardMaterial({ map: facadeTex(0.25), roughness: 0.8 }), { x: -50 + i * 7.6, y: h / 2, z: -78 - (i % 2) * 5, shadow: false });
@@ -987,12 +993,39 @@ function buildGarage(scene) {
   return { levels, drawBoard, sensorAt, marker, showZone };
 }
 
+// Ikkinchi garaj: joylarning ~60% band, mashinalar bir marta qo'yiladi; chiroqlar va tablo shunga mos
+function fillGarage(gar) {
+  const L = 'ABCDEFHKMNOPSTXYZ';
+  const busyC = new THREE.Color(0xff3b3b);
+  const freeC = new THREE.Color(0x2ee07a);
+  const free = [0, 0, 0];
+  for (const zone of Object.keys(ZONE_POS)) {
+    for (let n = 1; n <= 40; n++) {
+      const st = stallFor(zone + '-' + String(n).padStart(2, '0'));
+      const [im, i] = gar.sensorAt[st.label];
+      const busy = Math.random() < 0.6;
+      im.setColorAt(i, busy ? busyC : freeC);
+      if (im.instanceColor) im.instanceColor.needsUpdate = true;
+      if (!busy) {
+        free[st.level]++;
+        continue;
+      }
+      const plate = String(10 + Math.floor(Math.random() * 80)) + L[n % 17] + (100 + Math.floor(Math.random() * 900)) + L[(n * 7) % 17] + L[(n * 3) % 17];
+      const car = buildParkedCar(shapeFor(brandFor(plate, zone === 'A')), paintFor(plate));
+      car.position.set(st.x, st.y, st.z);
+      car.rotation.y = st.rot;
+      gar.levels[st.level].group.add(car);
+    }
+  }
+  gar.drawBoard(free);
+}
+
 // ---------- Savdo markazi: egri shisha fasad, to'lqinli tom-soyabon, burama minora ----------
 // Yozuv: "Tashkent City Mall" — podium tepasida, maydonga qaragan
 function buildMall(scene) {
   const g = new THREE.Group();
-  g.position.set(79, 0, -24); // g'arbiy devori garajning chiqish rampasiga tegib turadi
-  g.scale.setScalar(1.7);
+  g.position.set(87, 0, -22); // g'arbiy devori garaj rampasiga tegib turadi (x 57)
+  g.scale.set(2.3, 1.75, 2.3); // balandligi kamroq: 2-qavat garaj tomi bilan bir sathda — ko'prik to'g'ri kiradi
   scene.add(g);
   const glass = new THREE.MeshPhysicalMaterial({ color: 0x8fb4d6, metalness: 0.6, roughness: 0.06, clearcoat: 1, transparent: true, opacity: 0.88, side: THREE.DoubleSide });
   const glassTex = canvasTex(512, 256, (c, w, h) => {
@@ -1106,13 +1139,13 @@ function buildMall(scene) {
   g.add(board);
 
   // Garaj bilan savdo markazi orasidagi maydon: plitka, daraxtlar, bayroqlar
-  scene.add(mesh(new THREE.BoxGeometry(48, 0.06, 13), new THREE.MeshStandardMaterial({ map: tileTex([18, 5]), roughness: 0.85 }), { x: 79, y: 0.03, z: -14.5, shadow: false }));
-  for (const [x, z] of [[58.6, -9.6], [102.5, -10], [103, -16.5]]) scene.add(buildTree(x, z, 1.2, x));
+  scene.add(mesh(new THREE.BoxGeometry(62, 0.06, 7.4), new THREE.MeshStandardMaterial({ map: tileTex([24, 3]), roughness: 0.85 }), { x: 87, y: 0.03, z: -10.1, shadow: false }));
+  for (const [x, z] of [[119, -10], [119.5, -16.5], [121, -23]]) scene.add(buildTree(x, z, 1.2, x));
   const flagCloth = [0x1eb5e0, 0xf4f3ef, 0x1fa35a];
   for (let i = 0; i < 3; i++) {
-    const fx = 71.4 + i * 1.2;
-    scene.add(mesh(new THREE.CylinderGeometry(0.03, 0.03, 4, 8), mat(0xd9dde3, { metalness: 1, roughness: 0.2 }), { x: fx, y: 2, z: -15.5 }));
-    const cloth = mesh(new THREE.PlaneGeometry(0.9, 0.55, 8, 4), mat(flagCloth[i], { side: THREE.DoubleSide, roughness: 0.8 }), { x: fx + 0.45, y: 3.65, z: -15.5 });
+    const fx = 100 + i * 1.2;
+    scene.add(mesh(new THREE.CylinderGeometry(0.03, 0.03, 4, 8), mat(0xd9dde3, { metalness: 1, roughness: 0.2 }), { x: fx, y: 2, z: -11.8 }));
+    const cloth = mesh(new THREE.PlaneGeometry(0.9, 0.55, 8, 4), mat(flagCloth[i], { side: THREE.DoubleSide, roughness: 0.8 }), { x: fx + 0.45, y: 3.65, z: -11.8 });
     scene.add(cloth);
     g.userData.flags = [...(g.userData.flags || []), cloth];
   }
@@ -1126,7 +1159,76 @@ function buildMall(scene) {
   for (const x of [-1.5, 1.5]) bridge.add(box(0.05, 0.05, 8.3, mat(0xf2c230, { emissive: 0xf2c230, emissiveIntensity: 1.3 }), { x, y: 0.03, shadow: false }));
   for (const z of [-2.2, 2.2]) bridge.add(mesh(new THREE.CylinderGeometry(0.22, 0.28, 2 * FLOOR_H, 14), slab, { y: -FLOOR_H, z }));
   scene.add(bridge);
+
+  // Yopiq piyodalar yo'lagi: garaj oldidan savdo markazi eshigigacha — shisha soyabon va yo'nalish belgilari
+  const canopyGlass = new THREE.MeshPhysicalMaterial({ color: 0xcfe3f2, roughness: 0.08, transparent: true, opacity: 0.45, side: THREE.DoubleSide, depthWrite: false });
+  const post = mat(0xd9dde3, { metalness: 0.9, roughness: 0.25 });
+  scene.add(mesh(new THREE.BoxGeometry(32.5, 0.08, 2.9), canopyGlass, { x: 66.2, y: 3.1, z: -7.1, shadow: false }));
+  for (const z of [-5.75, -8.45]) scene.add(box(32.5, 0.14, 0.12, post, { x: 66.2, y: 3.05, z }));
+  for (let x = 50; x <= 82; x += 4) for (const z of [-5.75, -8.45]) scene.add(mesh(new THREE.CylinderGeometry(0.07, 0.07, 3.1, 8), post, { x, y: 1.55, z }));
+  const toMall = textTexture('Tashkent City Mall  →', { w: 1024, h: 128, bg: '#163a2b', fg: '#f2c230', font: 'bold 70px Georgia' });
+  for (const x of [52, 68]) scene.add(mesh(new THREE.PlaneGeometry(4.2, 0.52), new THREE.MeshStandardMaterial({ map: toMall, emissive: 0xffffff, emissiveMap: toMall, emissiveIntensity: 0.5 }), { x, y: 2.72, z: -5.68, shadow: false }));
   return g;
+}
+
+// ---------- Humo Arena: elliptik muz saroyi — pastda shisha qavat, "Humo qushi patlari" kabi egilgan oq qanotlar, gumbazsimon tom, ko'k chiroq halqalari ----------
+function buildArena(scene) {
+  const AX = 152;
+  const AZ = -36;
+  const RX = 25;
+  const RZ = 17;
+  const g = new THREE.Group();
+  g.position.set(AX, 0, AZ);
+  scene.add(g);
+  const white = mat(0xf4f3ef, { metalness: 0.2, roughness: 0.4 });
+  const glass = new THREE.MeshPhysicalMaterial({ color: 0x6f9cc8, metalness: 0.5, roughness: 0.08, clearcoat: 1, transparent: true, opacity: 0.9 });
+  const blue = mat(0x2f8cff, { emissive: 0x2f8cff, emissiveIntensity: 1.6 });
+  const oval = (r, h, m, y, open = false) => {
+    const c = mesh(new THREE.CylinderGeometry(1, 1, h, 96, 1, open), m, { y });
+    c.scale.set(r * RX, 1, r * RZ);
+    return c;
+  };
+  g.add(oval(1.1, 1.2, mat(0xd9d4c8, { roughness: 0.8 }), 0.6)); // stilobat
+  g.add(oval(0.95, 6, glass, 4.2, true)); // pastki shisha qavat (foye)
+  g.add(oval(1.0, 0.5, white, 7.45));
+  g.add(oval(1.003, 0.16, blue, 7.1, true));
+  g.add(oval(0.93, 9.6, mat(0x1d3550, { roughness: 0.4 }), 12.4)); // ichki baraban
+  // qanotlar: ellips bo'ylab 72 ta, har biri tashqariga qaragan va yon tomonga egilgan
+  const fins = new THREE.InstancedMesh(new THREE.BoxGeometry(0.32, 11.5, 2.4), white, 72);
+  const m4 = new THREE.Matrix4();
+  const q = new THREE.Quaternion();
+  const e = new THREE.Euler(0, 0, 0, 'YXZ');
+  const one = new THREE.Vector3(1, 1, 1);
+  for (let i = 0; i < 72; i++) {
+    const a = (i / 72) * Math.PI * 2;
+    e.set(-0.12, Math.atan2(Math.cos(a) / RX, Math.sin(a) / RZ), 0.42);
+    q.setFromEuler(e);
+    m4.compose(new THREE.Vector3(Math.cos(a) * RX, 13.2, Math.sin(a) * RZ), q, one);
+    fins.setMatrixAt(i, m4);
+  }
+  fins.castShadow = true;
+  g.add(fins);
+  // gumbazsimon oq tom va uning chetidagi ko'k halqa
+  const dome = mesh(new THREE.SphereGeometry(1, 96, 18, 0, Math.PI * 2, 0, Math.PI / 2), white, { y: 18.6 });
+  dome.scale.set(RX * 1.08, 4.2, RZ * 1.08);
+  g.add(dome);
+  g.add(oval(1.085, 0.5, white, 18.6));
+  g.add(oval(1.09, 0.22, blue, 18.3, true));
+  // kirish: soyabon, shisha eshiklar, zinapoyalar va "HUMO ARENA" yozuvi
+  g.add(box(18, 0.45, 5.5, white, { y: 6.2, z: RZ + 2.2 }));
+  for (const x of [-8, 8]) g.add(mesh(new THREE.CylinderGeometry(0.25, 0.25, 6, 14), white, { x, y: 3, z: RZ + 4.4 }));
+  g.add(box(15, 4.2, 0.2, mat(0x16202b, { metalness: 0.6, roughness: 0.1 }), { y: 3.3, z: RZ * 0.95 + 0.7 }));
+  for (let k = 0; k < 3; k++) g.add(box(22 - k * 1.2, 0.2, 1.1, mat(0xe3ded2), { y: 0.1 + k * 0.2, z: RZ + 6.6 - k * 1.1 }));
+  const signTex = textTexture('HUMO ARENA', { w: 1024, h: 160, fg: '#1f78ff', font: 'bold 124px Arial' });
+  signTex.wrapS = signTex.wrapT = THREE.ClampToEdgeWrapping;
+  g.add(mesh(new THREE.PlaneGeometry(24, 3.75), new THREE.MeshStandardMaterial({ map: signTex, transparent: true, emissive: 0xffffff, emissiveMap: signTex, emissiveIntensity: 0.9 }), { y: 20.4, z: RZ + 1.4, shadow: false }));
+  // oldidagi maydon (yo'lgacha), daraxtlar
+  scene.add(mesh(new THREE.BoxGeometry(60, 0.06, 12), new THREE.MeshStandardMaterial({ map: tileTex([24, 5]), roughness: 0.85 }), { x: AX, y: 0.03, z: -11.6, shadow: false }));
+  let seed = 300;
+  for (const x of [124, 128, 176, 180]) for (const z of [-10, -15]) scene.add(buildTree(x, z, 1.1, seed++));
+  return (time) => {
+    blue.emissiveIntensity = 1.3 + Math.sin(time * 1.4) * 0.35;
+  };
 }
 
 // ---------- Tashkent City Park: savdo markazi ro'parasida — charxpalak, karusel, amerikan tepaligi, tushish minorasi, favvora ----------
@@ -1276,15 +1378,189 @@ function buildPark(scene) {
     jets.push(j);
   }
 
-  // Daraxtlar va butalar park bo'ylab
-  let seed = 120;
-  for (let i = 0; i < 26; i++) {
-    const x = 62 + ((i * 37) % 48);
-    const z = 13 + ((i * 53) % 30);
-    if (Math.abs(x - PX) < 3 || (Math.abs(x - 70) < 6 && Math.abs(z - 20) < 6) || (Math.abs(x - FX) < 8 && Math.abs(z - FZ) < 8) || (x > 87 && z > 24)) continue;
-    scene.add(buildTree(x, z, 1 + (i % 3) * 0.15, seed++));
+  // ---------- Kengaytirilgan janubiy qism: zanjirli arg'imchoq, choynak karusel, urilma mashinalar, ko'l va oqqush qayiqlar, bolalar poyezdi, qaroqchi kemasi ----------
+  scene.add(mesh(new THREE.BoxGeometry(4, 0.05, 30), tiles(2, 15), { x: PX, y: 0.03, z: 58, shadow: false })); // markaziy xiyobon davomi
+  scene.add(mesh(new THREE.BoxGeometry(70, 0.05, 3.2), tiles(35, 1.6), { x: 92, y: 0.031, z: 45, shadow: false })); // ko'ndalang xiyobon
+  scene.add(mesh(new THREE.BoxGeometry(3.2, 0.05, 32), tiles(1.6, 16), { x: 58, y: 0.031, z: 30, shadow: false })); // g'arbiy yo'lka
+
+  // Zanjirli arg'imchoq: aylanadigan toj, 12 o'rindiq tezlikka qarab tashqariga uchadi
+  const SW = { x: 64, z: 57 };
+  scene.add(mesh(new THREE.CylinderGeometry(3, 3.2, 0.3, 32), mat(0xe9e2d0), { x: SW.x, y: 0.15, z: SW.z }));
+  scene.add(mesh(new THREE.CylinderGeometry(0.45, 0.6, 9, 16), mat(0x2e8be0, { metalness: 0.5, roughness: 0.4 }), { x: SW.x, y: 4.5, z: SW.z }));
+  const swingTop = new THREE.Group();
+  swingTop.position.set(SW.x, 9, SW.z);
+  scene.add(swingTop);
+  swingTop.add(mesh(new THREE.ConeGeometry(3.4, 1.4, 24), mat(0xf2c230, { roughness: 0.5 }), { y: 0.7 }));
+  const swingRing = mesh(new THREE.TorusGeometry(3.3, 0.07, 6, 48), glowMat(0x5af0ff, 1.8), { shadow: false });
+  swingRing.rotation.x = Math.PI / 2;
+  swingTop.add(swingRing);
+  const swings = [];
+  for (let i = 0; i < 12; i++) {
+    const arm = new THREE.Group();
+    arm.rotation.y = (i / 12) * Math.PI * 2;
+    const pivot = new THREE.Group();
+    pivot.position.x = 3;
+    const seatMat = mat(cabinColors[i % 4], { roughness: 0.4 });
+    pivot.add(mesh(new THREE.CylinderGeometry(0.02, 0.02, 4, 4), steel, { y: -2, shadow: false }));
+    pivot.add(box(0.5, 0.08, 0.5, seatMat, { y: -4 }), box(0.5, 0.45, 0.06, seatMat, { y: -3.8, z: -0.22 }));
+    arm.add(pivot);
+    swingTop.add(arm);
+    swings.push(pivot);
   }
-  for (let x = 64; x < 106; x += 2.4) scene.add(buildBush(x, 11.6, 0.9, seed++));
+
+  // Choynak karusel: aylanuvchi disk ustida o'zi ham aylanadigan 5 ta piyola
+  scene.add(mesh(new THREE.CylinderGeometry(4.6, 4.8, 0.3, 40), mat(0xd94a6a, { roughness: 0.5 }), { x: 77, y: 0.15, z: 54 }));
+  const teacups = new THREE.Group();
+  teacups.position.set(77, 0.3, 54);
+  scene.add(teacups);
+  const cups = [];
+  for (let i = 0; i < 5; i++) {
+    const a = (i / 5) * Math.PI * 2;
+    const cup = new THREE.Group();
+    cup.position.set(Math.cos(a) * 2.8, 0, Math.sin(a) * 2.8);
+    cup.add(mesh(new THREE.CylinderGeometry(0.95, 0.6, 0.9, 20, 1, true), mat(cabinColors[(i + 1) % 4], { roughness: 0.35, side: THREE.DoubleSide }), { y: 0.55 }));
+    cup.add(mesh(new THREE.CylinderGeometry(0.6, 0.6, 0.12, 20), white, { y: 0.12 }));
+    const lip = mesh(new THREE.TorusGeometry(0.97, 0.06, 6, 24), white, { y: 1.0 });
+    lip.rotation.x = Math.PI / 2;
+    cup.add(lip);
+    teacups.add(cup);
+    cups.push(cup);
+  }
+
+  // Urilma mashinalar: tomli maydoncha, 6 ta mashina erkin aylanib yuradi
+  const BC = { x: 73, z: 68 };
+  scene.add(box(13, 0.2, 7.5, mat(0x3a3f47, { metalness: 0.4, roughness: 0.5 }), { x: BC.x, y: 0.1, z: BC.z }));
+  for (const [dx, dz] of [[-6.3, -3.6], [6.3, -3.6], [-6.3, 3.6], [6.3, 3.6]]) scene.add(mesh(new THREE.CylinderGeometry(0.12, 0.12, 4, 8), steel, { x: BC.x + dx, y: 2, z: BC.z + dz }));
+  scene.add(box(13.4, 0.25, 7.9, mat(0x163a2b), { x: BC.x, y: 4.1, z: BC.z }));
+  scene.add(box(13.4, 0.08, 0.1, glowMat(0xff4fd8, 2), { x: BC.x, y: 3.95, z: BC.z + 3.95, shadow: false }));
+  const bumpers = [];
+  const rubber = mat(0x15171a);
+  for (let i = 0; i < 6; i++) {
+    const c = new THREE.Group();
+    c.add(box(1.1, 0.4, 1.5, mat(cabinColors[i % 4], { roughness: 0.3, metalness: 0.2 }), { y: 0.45 }));
+    const bumper = mesh(new THREE.CylinderGeometry(0.85, 0.85, 0.18, 18), rubber, { y: 0.3 });
+    bumper.scale.set(0.8, 1, 1.05);
+    c.add(bumper, mesh(new THREE.CylinderGeometry(0.02, 0.02, 3.4, 4), steel, { y: 2.2, z: -0.5, shadow: false }));
+    scene.add(c);
+    bumpers.push({ c, p: i * 1.7, w: 0.35 + (i % 3) * 0.08 });
+  }
+
+  // Ko'l va oqqush qayiqlar
+  const LK = { x: 101, z: 59, rx: 11, rz: 7 };
+  const rim = mesh(new THREE.CylinderGeometry(1, 1, 0.3, 64), mat(0xcfc8b8, { roughness: 0.8 }), { x: LK.x, y: 0.15, z: LK.z });
+  rim.scale.set(LK.rx + 0.8, 1, LK.rz + 0.8);
+  scene.add(rim);
+  const lake = mesh(new THREE.CylinderGeometry(1, 1, 0.08, 64), new THREE.MeshPhysicalMaterial({ color: 0x3f8fc9, roughness: 0.05, metalness: 0.1, clearcoat: 1, transparent: true, opacity: 0.9 }), { x: LK.x, y: 0.31, z: LK.z, shadow: false });
+  lake.scale.set(LK.rx, 1, LK.rz);
+  scene.add(lake);
+  const plume = mat(0xffffff, { roughness: 0.5 });
+  const swans = [];
+  for (let i = 0; i < 4; i++) {
+    const b = new THREE.Group();
+    const body = mesh(new THREE.SphereGeometry(0.7, 16, 10), plume, { y: 0.35 });
+    body.scale.set(0.8, 0.55, 1.3);
+    const beak = mesh(new THREE.ConeGeometry(0.06, 0.25, 6), mat(0xf28a1e), { y: 1.42, z: 0.92 });
+    beak.rotation.x = Math.PI / 2;
+    b.add(body, mesh(new THREE.CylinderGeometry(0.1, 0.16, 1.0, 8), plume, { y: 0.95, z: 0.65 }), mesh(new THREE.SphereGeometry(0.17, 10, 8), plume, { y: 1.45, z: 0.72 }), beak);
+    scene.add(b);
+    swans.push({ b, ph: i * 1.6, w: 0.09 + i * 0.015, r: 0.45 + (i % 2) * 0.2 });
+  }
+
+  // Bolalar poyezdi: ko'l atrofidagi relsda lokomotiv va 3 vagon
+  const trainPath = new THREE.CatmullRomCurve3(Array.from({ length: 24 }, (_, i) => {
+    const a = (i / 24) * Math.PI * 2;
+    return new THREE.Vector3(LK.x + Math.cos(a) * 14.5, 0.12, LK.z + Math.sin(a) * 10 + Math.sin(a * 3) * 0.6);
+  }), true);
+  scene.add(mesh(new THREE.TubeGeometry(trainPath, 200, 0.07, 4, true), mat(0x6b4a2f), { shadow: false }));
+  const sleeperMat = mat(0x5a4636);
+  for (let i = 0; i < 90; i++) {
+    trainPath.getPointAt(i / 90, p);
+    const tn = trainPath.getTangentAt(i / 90);
+    const sl = box(0.9, 0.06, 0.2, sleeperMat, { x: p.x, y: 0.05, z: p.z, shadow: false });
+    sl.rotation.y = Math.atan2(tn.x, tn.z);
+    scene.add(sl);
+  }
+  const kidTrain = [];
+  for (let i = 0; i < 4; i++) {
+    const c = new THREE.Group();
+    c.add(box(1, 0.7, 1.8, mat(i === 0 ? 0xd63a3a : cabinColors[i % 4], { roughness: 0.4 }), { y: 0.55 }));
+    c.add(i === 0 ? mesh(new THREE.CylinderGeometry(0.15, 0.2, 0.6, 10), rubber, { y: 1.2, z: 0.5 }) : box(1.05, 0.06, 1.85, white, { y: 1.5 }));
+    for (const z of [-0.6, 0.6]) for (const x of [-0.5, 0.5]) {
+      const wh = mesh(new THREE.CylinderGeometry(0.2, 0.2, 0.12, 12), rubber, { x, y: 0.2, z });
+      wh.rotation.z = Math.PI / 2;
+      c.add(wh);
+    }
+    scene.add(c);
+    kidTrain.push(c);
+  }
+
+  // Qaroqchi kemasi: A-shaklidagi ramka, kema bo'yi bo'ylab tebranadi
+  const SH = { x: 122, z: 56 };
+  for (const dx of [-2.6, 2.6]) {
+    for (const dz of [-4.5, 4.5]) {
+      const leg = mesh(new THREE.CylinderGeometry(0.18, 0.25, Math.hypot(9, dz), 10), steel, { x: SH.x + dx, y: 4.5, z: SH.z + dz / 2 });
+      leg.rotation.x = -Math.atan2(dz, 9);
+      scene.add(leg);
+    }
+  }
+  const axle = mesh(new THREE.CylinderGeometry(0.2, 0.2, 5.6, 12), steel, { x: SH.x, y: 9, z: SH.z });
+  axle.rotation.z = Math.PI / 2;
+  scene.add(axle);
+  const shipPivot = new THREE.Group();
+  shipPivot.position.set(SH.x, 9, SH.z);
+  scene.add(shipPivot);
+  const wood = mat(0x7a4a2a, { roughness: 0.7 });
+  shipPivot.add(box(2.6, 1.3, 7.5, wood, { y: -6.4 }), box(2.7, 0.18, 7.6, mat(0xf2c230), { y: -5.7 }));
+  for (const z of [-3.6, 3.6]) {
+    const end = box(2.4, 1.2, 1.6, wood, { y: -5.6, z });
+    end.rotation.x = z > 0 ? -0.5 : 0.5;
+    shipPivot.add(end);
+  }
+  shipPivot.add(mesh(new THREE.CylinderGeometry(0.08, 0.1, 3.6, 8), wood, { y: -3.9 }));
+  shipPivot.add(mesh(new THREE.PlaneGeometry(2.6, 2.0), mat(0xf4f3ef, { side: THREE.DoubleSide }), { y: -3.6 }));
+  for (const z of [-2.2, 2.2]) {
+    const arm = mesh(new THREE.CylinderGeometry(0.1, 0.1, Math.hypot(6.2, z), 8), steel, { y: -3.1, z: z / 2 });
+    arm.rotation.x = -Math.atan2(z, 6.2);
+    shipPivot.add(arm);
+  }
+
+  // Sayr qiluvchilar: xiyobonlar va ko'l bo'yida yurishadi
+  const lakeLoop = Array.from({ length: 16 }, (_, i) => [LK.x + Math.cos((i / 16) * Math.PI * 2) * 12.4, LK.z + Math.sin((i / 16) * Math.PI * 2) * 8.4]);
+  const strollPaths = [
+    [[83.2, 12], [83.2, 72], [84.8, 72], [84.8, 12]],
+    [[84.8, 40], [84.8, 12], [83.2, 12], [83.2, 40]],
+    [[58, 44.4], [126, 44.4], [126, 45.6], [58, 45.6]],
+    [[110, 45.6], [58, 45.6], [58, 44.4], [110, 44.4]],
+    [[60, 21.4], [106, 21.4], [106, 22.6], [60, 22.6]],
+    [[57.5, 16], [57.5, 44], [58.6, 44], [58.6, 16]],
+    lakeLoop,
+    [...lakeLoop].reverse(),
+  ];
+  const strollers = strollPaths.map((pts, i) => {
+    const pp = buildGuard(CIVILIANS[i % CIVILIANS.length]);
+    pp.scale.setScalar(0.95);
+    scene.add(pp);
+    const loop = new THREE.CatmullRomCurve3(pts.map(([x, z]) => new THREE.Vector3(x, 0.05, z)), true, 'centripetal');
+    return { pp, loop, len: loop.getLength(), s: (i * 0.37) % 1, speed: 0.9 + (i % 3) * 0.15 };
+  });
+
+  // Daraxtlar: atraksion va yo'lkalardan bo'sh joylarga, tartibsiz (tabiiy) joylashuv
+  const taken = [[81.5, 86.5, 9, 74], [60, 108, 20, 24], [56, 127, 43, 47], [56.4, 59.6, 14, 46], [64, 76, 14, 26], [63, 81, 25, 43], [79, 107, 26, 34],
+    [97, 105, 14, 22], [100, 124, 23, 43], [56, 72, 49, 65], [72, 82, 49, 59], [65, 81, 63, 73], [85, 117, 47, 71], [117, 127, 46, 66]];
+  let seed = 120;
+  for (let x = 58; x <= 127; x += 4.6) {
+    for (let z = 13; z <= 72; z += 4.6) {
+      const jx = x + Math.sin(seed * 12.9898) * 1.6;
+      const jz = z + Math.cos(seed * 78.233) * 1.6;
+      seed++;
+      if (taken.some(([x0, x1, z0, z1]) => jx > x0 - 1.5 && jx < x1 + 1.5 && jz > z0 - 1.5 && jz < z1 + 1.5)) continue;
+      scene.add(buildTree(jx, jz, 0.9 + (seed % 4) * 0.12, seed));
+    }
+  }
+  for (let x = 58; x < 128; x += 2.4) if (Math.abs(x - PX) > 3.5) scene.add(buildBush(x, 11.6, 0.9, seed++));
+  for (let x = 57; x < 128; x += 2.2) scene.add(buildBush(x, 75, 1.1, seed++)); // janubiy chegara — buta to'sig'i
+  // park bilan darvoza orasidagi maysazor — siyrak daraxtzor
+  for (let x = 16; x <= 52; x += 6) for (let z = 15; z <= 72; z += 6) scene.add(buildTree(x + Math.sin(seed * 3.1) * 2, z + Math.cos(seed * 1.7) * 2, 0.9 + (seed % 3) * 0.15, seed++));
 
   return (time, dt) => {
     wheel.rotation.z += dt * 0.06;
@@ -1303,6 +1579,41 @@ function buildPark(scene) {
       car.lookAt(p);
     });
     jets.forEach((j, i) => { j.scale.y = i === 8 ? 3 + Math.sin(time * 2.2) * 0.8 : 1.4 + Math.max(0, Math.sin(time * 3 + i * 0.8)) * 1.6; });
+    // arg'imchoq: 20 s aylanadi, 8 s to'xtaydi — sekin tezlashib, sekin to'xtaydi
+    const sp = time % 28;
+    const run = sp < 20 ? smooth(Math.min(1, sp / 4)) * smooth(Math.min(1, (20 - sp) / 4)) : 0;
+    swingTop.rotation.y += dt * 1.5 * run;
+    swingTop.rotation.x = Math.sin(time * 0.6) * 0.05 * run;
+    for (const pv of swings) pv.rotation.z = 0.06 + 0.85 * run;
+    teacups.rotation.y += dt * 0.45;
+    cups.forEach((c, i) => { c.rotation.y += dt * (1.2 + i * 0.25); });
+    for (const b of bumpers) {
+      const a = time * b.w + b.p;
+      const a2 = time * b.w * 1.37 + b.p * 2;
+      b.c.position.set(BC.x + Math.sin(a) * 5, 0.2, BC.z + Math.sin(a2) * 2.6);
+      b.c.rotation.y = Math.atan2(Math.cos(a) * 5, Math.cos(a2) * 2.6 * 1.37);
+    }
+    for (const sw of swans) {
+      const a = time * sw.w + sw.ph;
+      sw.b.position.set(LK.x + Math.cos(a) * LK.rx * sw.r, 0.3 + Math.sin(time * 1.3 + sw.ph) * 0.04, LK.z + Math.sin(a) * LK.rz * sw.r);
+      sw.b.rotation.y = Math.atan2(-Math.sin(a) * LK.rx, Math.cos(a) * LK.rz);
+    }
+    kidTrain.forEach((car, i) => {
+      const u = (((time * 0.012 - i * 0.026) % 1) + 1) % 1;
+      trainPath.getPointAt(u, car.position);
+      trainPath.getPointAt((u + 0.004) % 1, p);
+      car.lookAt(p);
+    });
+    // qaroqchi kemasi: 24 s tebranadi (amplituda o'sib-kamayadi), 6 s tinch
+    const ph = time % 30;
+    shipPivot.rotation.x = (ph < 24 ? Math.sin((Math.PI * ph) / 24) * 1.05 : 0) * Math.sin((time * 2 * Math.PI) / 4.6);
+    for (const w of strollers) {
+      w.s = (w.s + (dt * w.speed) / w.len) % 1;
+      w.loop.getPointAt(w.s, w.pp.position);
+      const tn = w.loop.getTangentAt(w.s);
+      w.pp.rotation.y = Math.atan2(-tn.z, tn.x);
+      poseGuard(w.pp, 'walk', time, dt, null);
+    }
   };
 }
 
@@ -1324,7 +1635,7 @@ function buildWalkers(scene) {
     const zb = -24.4 - (i - 3) * 0.9;
     const pts = i >= 3
       ? [[49.4, 6.4, zb], [56.4, 6.4, zb], [56.6, 6.4, zb - 0.35], [49.2, 6.4, zb - 0.35]]
-      : [[x + 34, 0, -6.4], [x + 52, 0, -6.4], [78 + (i - 1) * 0.6, 0, -19.6], [73 + i, 0, -12], [x + 42, 0, -6.1]];
+      : [[x + 34, 0, -6.4], [x + 52, 0, -6.4], [87 + (i - 1) * 0.8, 0, -12.6], [80 + i, 0, -8.8], [x + 42, 0, -6.1]];
     const loop = new THREE.CatmullRomCurve3(pts.map(([px, py, pz]) => new THREE.Vector3(px, py, pz)), true, 'centripetal');
     return { p, loop, len: loop.getLength(), s: (i * 0.23) % 1, speed: 1.0 + (i % 3) * 0.15 };
   });
@@ -1372,21 +1683,21 @@ export default function Gate3D({ event, arrival, reject, release, spots, focusZo
 
     const scene = new THREE.Scene();
     scene.background = skyTex();
-    scene.fog = new THREE.Fog(0xd8d3c8, 70, 220);
+    scene.fog = new THREE.Fog(0xd8d3c8, 190, 520);
     const pmrem = new THREE.PMREMGenerator(renderer);
     scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
     renderer.toneMappingExposure = 1.05;
-    const camera = new THREE.PerspectiveCamera(46, 1, 0.1, 340);
+    const camera = new THREE.PerspectiveCamera(46, 1, 0.1, 700);
     const plateCam = new THREE.PerspectiveCamera(12, 16 / 10, 0.1, 40); // tor burchakli raqam kamerasi
 
     scene.add(new THREE.HemisphereLight(0xdfe6ff, 0x30343a, 1.3));
     const sun = new THREE.DirectionalLight(0xffe7c4, 2.6); // past quyosh — uzun soyalar
-    sun.position.set(27, 21, 19);
-    sun.target.position.set(45, 0, -2);
+    sun.position.set(23, 84, 92);
+    sun.target.position.set(95, 0, 8);
     scene.add(sun.target);
     sun.castShadow = true;
     sun.shadow.mapSize.set(4096, 4096);
-    Object.assign(sun.shadow.camera, { left: -70, right: 70, top: 55, bottom: -55, far: 150 });
+    Object.assign(sun.shadow.camera, { left: -140, right: 140, top: 95, bottom: -95, far: 330 });
     sun.shadow.bias = -0.0004;
     scene.add(sun);
 
@@ -1395,6 +1706,15 @@ export default function Gate3D({ event, arrival, reject, release, spots, focusZo
     const mall = buildMall(scene);
     const walkers = buildWalkers(scene);
     const park = buildPark(scene);
+    const arena = buildArena(scene);
+    // Ikkinchi garaj (200 joy) — park yonida, yo'lning narigi tomonida, birinchisiga ko'zgudek qaragan
+    const garage2Root = new THREE.Group();
+    garage2Root.position.x = 188;
+    garage2Root.rotation.y = Math.PI;
+    scene.add(garage2Root);
+    const garage2 = buildGarage(garage2Root);
+    garage2Root.traverse((o) => o.isLight && (o.visible = false)); // ichki chiroqlar uzoqdan ko'rinmaydi, faqat sahnani sekinlashtiradi
+    fillGarage(garage2);
 
     // To'xtab turgan mashinalar (yengil model) — serverdagi band joylar bilan bir xil
     const parked = parkedRef.current;
@@ -1654,6 +1974,7 @@ export default function Gate3D({ event, arrival, reject, release, spots, focusZo
         poseGuard(wk.p, 'walk', time, dt, null);
       }
       park(time, dt);
+      arena(time);
       mall.userData.revolve.rotation.y += dt * 0.5;
       for (const cloth of mall.userData.flags) {
         const a = cloth.geometry.attributes.position;
@@ -1672,12 +1993,9 @@ export default function Gate3D({ event, arrival, reject, release, spots, focusZo
         offGoal.multiplyScalar(0.55);
       } else if (mover) camGoal.lerp(look.set(mover.position.x, mover.position.y + 1.2, mover.position.z), 0.55);
       else if (!still && tourT > 12) {
-        const u = (tourT - 12) % (TOUR.length * 15);
-        const i = Math.floor(u / 15);
-        const f = smooth(clamp01(((u % 15) - 9) / 6)); // 9 s turadi, 6 s keyingi nuqtaga o'tadi
-        const [a, b] = [TOUR[i], TOUR[(i + 1) % TOUR.length]];
-        camGoal.lerpVectors(a[0], b[0], f);
-        offGoal.lerpVectors(a[1], b[1], f).setLength(lerp(a[1].length(), b[1].length(), f));
+        // bo'sh payt: o'rtadan umumiy ko'rinish, sekin chayqalib turadi
+        camGoal.copy(OVERVIEW[0]);
+        offGoal.copy(OVERVIEW[1]).applyAxisAngle(Y_AXIS, Math.sin(time * 0.04) * 0.16);
       }
       camTarget.lerp(camGoal, Math.min(1, dt * 1.1));
       camOff.lerp(offGoal, Math.min(1, dt * 1.1));

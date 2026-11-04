@@ -255,3 +255,16 @@ Bepul Render 15 daqiqa so'rov bo'lmasa uxlaydi; birinchi so'rovda ~1 daqiqada uy
 bazani tozadan yaratish: `npm run local:init-db`. `.env` da `PG_POOL_MAX=1` bo'lishi shart: PGlite bitta ulanishda ishlaydi,
 ulanish yopilib qayta ochilsa qotib qoladi (login va so'rovlar javobsiz qoladi, "Serverda xato").
 Vercel'dagi sayt shu kompyuterdagi serverga ulanganda Chrome "mahalliy tarmoqqa kirish" ruxsatini so'rashi mumkin — Ruxsat berish.
+
+## 18. Kengaygan shahar: katta mall, Humo Arena, katta park, ikkinchi garaj (3D)
+
+- **Mall** 2.3 baravar kattalashdi (eni ~60 m), g'arbiy devori garaj rampasiga tegib turadi. Garajdan mallga ikki yo'l:
+  2-qavat tomidan shisha ko'prik va yer sathida yopiq shisha soyabonli piyodalar yo'lagi («Tashkent City Mall →»).
+- **Humo Arena** — mallning sharqida, yo'lning shu tomonida: elliptik bino, pastda shisha foye, ko'k chiroq halqalari,
+  egilgan oq qanotlar (Humo qushi patlari), gumbazsimon oq tom, «HUMO ARENA» yozuvi, oldida maydon va zinapoyalar.
+- **Park** janubga kengaydi (z 9..75): zanjirli arg'imchoq (aylanib-to'xtaydi), choynak karusel, urilma mashinalar,
+  ko'l va oqqush qayiqlar, ko'l atrofida bolalar poyezdi, qaroqchi kemasi; xiyobonlarda 8 kishi sayr qiladi, tartibsiz daraxtzor.
+- **Ikkinchi garaj (200 joy)** — park yonida, yo'lning narigi tomonida, birinchisiga ko'zgudek; joylarning ~60% band (bezak),
+  sensorlar va LED tablo shunga mos. Kirish yo'li va «P 200» belgisi.
+- **Kamera:** voqea bo'lsa — darvoza; 12 soniya tinch bo'lsa — o'rtadan umumiy ko'rinish, hamma binolar bir kadrda.
+- **Avtomatik oqim:** qorovul panelida har 2 daqiqada bitta chiqish (QR skaner) va bitta kirish (chek bilan).
