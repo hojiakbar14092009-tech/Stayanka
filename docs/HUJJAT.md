@@ -260,7 +260,7 @@ Vercel'dagi sayt shu kompyuterdagi serverga ulanganda Chrome "mahalliy tarmoqqa 
 
 - **Mall** 2.3 baravar kattalashdi (eni ~60 m), g'arbiy devori garaj rampasiga tegib turadi. Garajdan mallga ikki yo'l:
   2-qavat tomidan shisha ko'prik va yer sathida yopiq shisha soyabonli piyodalar yo'lagi («Tashkent City Mall →»).
-- **Humo Arena** — 1-garajning ortida, darvoza kamerasining qoq ro'parasida: elliptik bino, pastda shisha foye, ko'k chiroq halqalari,
+- **Humo Arena** — yo'lning park tomonida, mall bilan park o'rtasida; park janubga surilgan, ular orasida ochiq xiyobon va yo'lda piyodalar o'tish joyi (zebra) — mall ↔ park yo'li to'silmaydi: elliptik bino, pastda shisha foye, ko'k chiroq halqalari,
   egilgan oq qanotlar (Humo qushi patlari), gumbazsimon oq tom, «HUMO ARENA» yozuvi, oldida maydon va zinapoyalar.
 - **Park** janubga kengaydi (z 9..75): zanjirli arg'imchoq (aylanib-to'xtaydi), choynak karusel, urilma mashinalar,
   ko'l va oqqush qayiqlar, ko'l atrofida bolalar poyezdi, qaroqchi kemasi; xiyobonlarda 8 kishi sayr qiladi, tartibsiz daraxtzor.
@@ -279,3 +279,8 @@ Vercel'dagi sayt shu kompyuterdagi serverga ulanganda Chrome "mahalliy tarmoqqa 
 - Boshqa stoyankaning chekini skanerlasa: «Bu chek 2-stoyankaniki». Mashina bir vaqtda ikki stoyankada bo'lolmaydi.
 - Admin tepa paneldagi «1-stoyanka / 2-stoyanka» tugmasi bilan almashtiradi.
 - Bir brauzerda ikki qorovul: token har tabda alohida (sessionStorage) — har tab o'z qorovulida qoladi.
+
+## 20. Erkin kamera
+
+- 3D sahnada sichqoncha: chap tugma — aylantirish, o'ng tugma — siljitish, g'ildirak — yaqinlashtirish; sahna tanlansa strelkalar bilan siljitish.
+- Tegilgan zahoti avtomatik kamera to'xtaydi, o'ng yuqorida «Avtomatik kamera» tugmasi chiqadi; 45 soniya tegilmasa o'zi qaytadi.

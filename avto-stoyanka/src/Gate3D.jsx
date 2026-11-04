@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import * as THREE from 'three';
 import { clamp01, smooth, seg, lerp, lerpAngle, mat, mesh, box, drawPlate, buildCar, buildParkedCar, buildGuard, poseGuard, driveCar } from './three-kit';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { paintFor, brandFor, shapeFor, VIP_PERKS } from './api';
 
 // "Shifrlangan" so'kinishlar — tsenzura belgilarida
@@ -40,7 +41,7 @@ const GATE_VIEW = [new THREE.Vector3(15, 4, -16), new THREE.Vector3(0, 13, 42)];
 // 2-stoyanka: shahar x = 94 atrofida 180° buriladi — park yonidagi garaj darvoza joyiga keladi
 const MIRROR = new THREE.Matrix4().makeRotationY(Math.PI).setPosition(188, 0, 0);
 // Bo'sh payt: o'rtadan umumiy ko'rinish — garaj, mall, Humo Arena, park va ikkinchi garaj bir kadrda
-const OVERVIEW = [new THREE.Vector3(98, 0, 6), new THREE.Vector3(0, 104, 128)];
+const OVERVIEW = [new THREE.Vector3(98, 0, 28), new THREE.Vector3(0, 125, 150)];
 const Y_AXIS = new THREE.Vector3(0, 1, 0);
 
 // "B-07" → 3D joy: qavat, koordinata, qaysi yo'lakdan kiriladi, mashina qaysi tomonga qaraydi
@@ -566,10 +567,10 @@ function buildWorld(scene, gate) {
   for (const z of [-ROAD_EDGE - 3.4, ROAD_EDGE + 3.4]) {
     for (let x = -20; x <= 208; x += 4.2) {
       if (z < 0 && (Math.abs(x - 0.5) < 2 || x > 5)) continue; // budka ro'parasi va to'xtash maydoni ochiq
-      if (z > 0 && (x > 128 || (x > -10 && x < 30))) continue; // ikkinchi garaj oldi va darvoza kamerasi oldi ochiq
+      if (z > 0 && (x > 128 || (x > -10 && x < 80))) continue; // ikkinchi garaj oldi, darvoza kamerasi va Humo Arena oldi ochiq
       scene.add(buildTree(x + Math.sin(seed) * 0.6, z + Math.cos(seed) * 0.4, 0.95 + (seed % 3) * 0.12, seed++));
     }
-    for (let x = -19; x <= 127; x += 2.1) if ((z > 0 && Math.abs(x - 84) > 3.5) || x < 6) scene.add(buildBush(x, z > 0 ? z - 1.2 : z + 1.2, 0.8 + (seed % 2) * 0.2, seed++));
+    for (let x = -19; x <= 127; x += 2.1) if ((z > 0 && Math.abs(x - 84) > 3.5 && (x < 22 || x > 79)) || x < 6) scene.add(buildBush(x, z > 0 ? z - 1.2 : z + 1.2, 0.8 + (seed % 2) * 0.2, seed++));
   }
   for (const x of [-5.2, 6.2]) gate.add(buildBush(x, 0, 1, seed++)); // orolchadagi gulzor
   // Ko'cha chiroqlari ikki tomonda
@@ -1177,12 +1178,13 @@ function buildMall(scene) {
 
 // ---------- Humo Arena: elliptik muz saroyi — pastda shisha qavat, "Humo qushi patlari" kabi egilgan oq qanotlar, gumbazsimon tom, ko'k chiroq halqalari ----------
 function buildArena(scene) {
-  const AX = 29;
-  const AZ = -60;
+  const AX = 50;
+  const AZ = 32;
   const RX = 25;
   const RZ = 17;
   const g = new THREE.Group();
   g.position.set(AX, 0, AZ);
+  g.rotation.y = Math.PI; // kirish yo'lga (shimolga) qaragan
   scene.add(g);
   const white = mat(0xf4f3ef, { metalness: 0.2, roughness: 0.4 });
   const glass = new THREE.MeshPhysicalMaterial({ color: 0x6f9cc8, metalness: 0.5, roughness: 0.08, clearcoat: 1, transparent: true, opacity: 0.9 });
@@ -1227,17 +1229,27 @@ function buildArena(scene) {
   signTex.wrapS = signTex.wrapT = THREE.ClampToEdgeWrapping;
   g.add(mesh(new THREE.PlaneGeometry(24, 3.75), new THREE.MeshStandardMaterial({ map: signTex, transparent: true, emissive: 0xffffff, emissiveMap: signTex, emissiveIntensity: 0.9 }), { y: 20.4, z: RZ + 1.4, shadow: false }));
   // oldidagi maydon (yo'lgacha), daraxtlar
-  scene.add(mesh(new THREE.BoxGeometry(56, 0.06, 15), new THREE.MeshStandardMaterial({ map: tileTex([22, 6]), roughness: 0.85 }), { x: AX, y: 0.03, z: -33.5, shadow: false }));
+  scene.add(mesh(new THREE.BoxGeometry(56, 0.06, 6.4), new THREE.MeshStandardMaterial({ map: tileTex([22, 3]), roughness: 0.85 }), { x: AX, y: 0.03, z: 10.5, shadow: false }));
   let seed = 300;
-  for (const x of [AX - 31, AX - 35]) for (const z of [-34, -46, -58]) scene.add(buildTree(x, z, 1.1, seed++));
+  for (const x of [AX - 33, AX - 37]) for (const z of [AZ - 6, AZ + 6]) scene.add(buildTree(x, z, 1.1, seed++));
   return (time) => {
     blue.emissiveIntensity = 1.3 + Math.sin(time * 1.4) * 0.35;
   };
 }
 
 // ---------- Tashkent City Park: savdo markazi ro'parasida — charxpalak, karusel, amerikan tepaligi, tushish minorasi, favvora ----------
-function buildPark(scene) {
+const PARK_DZ = 42; // park arena ortida: yo'ldan park darvozasigacha ochiq xiyobon
+function buildPark(city) {
+  const scene = new THREE.Group();
+  scene.position.z = PARK_DZ;
+  city.add(scene);
   const PX = 84;
+  // yo'l → park darvozasi: arena yonidan o'tadigan xiyobon, ikki chetida butalar, yo'lda "zebra"
+  city.add(mesh(new THREE.BoxGeometry(4, 0.05, PARK_DZ + 2.4), new THREE.MeshStandardMaterial({ map: tileTex([2, 22]), roughness: 0.85 }), { x: PX, y: 0.03, z: 7.35 + (PARK_DZ + 2.4) / 2, shadow: false }));
+  for (let z = 10; z < PARK_DZ + 8; z += 2.3) for (const dx of [-3, 3]) city.add(buildBush(PX + dx, z, 0.75, z * 7 + dx));
+  for (let z = -4.3; z <= 4.3; z += 0.95) city.add(box(3.6, 0.012, 0.48, mat(0xeceae4, { roughness: 0.8 }), { x: PX, y: 0.024, z, shadow: false }));
+  // xiyobonning sharqi (yo'l bilan park orasi) — siyrak daraxtzor
+  for (let x = 92; x <= 126; x += 6.5) for (let z = 14; z <= PARK_DZ + 4; z += 7) city.add(buildTree(x + Math.sin(x * z) * 1.5, z + Math.cos(x + z) * 1.5, 0.9 + ((x + z) % 3) * 0.12, x * z));
   const white = mat(0xf4f3ef, { metalness: 0.4, roughness: 0.35 });
   const steel = mat(0xc9ced6, { metalness: 0.8, roughness: 0.3 });
   const glowMat = (c, k = 1.6) => mat(c, { emissive: c, emissiveIntensity: k });
@@ -1657,6 +1669,8 @@ export default function Gate3D({ lot = 1, event, arrival, reject, release, spots
   const queue = useRef({ in: [], out: [] });
   const current = useRef({ in: null, out: null }); // { fn, t, ev, read }
   const [big, setBig] = useState(false); // butun ekran
+  const [freeCam, setFreeCam] = useState(false); // foydalanuvchi kamerani o'zi boshqaryapti
+  const autoCam = useRef(false); // "Avtomatik kamera" bosildi
   const onRead = useRef(onPlateRead);
   useEffect(() => { onRead.current = onPlateRead; }, [onPlateRead]);
   // Garajdagi mashinalar — real bandlik: animIn — hali yo'lda (joyida ko'rsatilmaydi), pendingOut — chiqish navbatida (joyida turadi)
@@ -1696,8 +1710,8 @@ export default function Gate3D({ lot = 1, event, arrival, reject, release, spots
 
     scene.add(new THREE.HemisphereLight(0xdfe6ff, 0x30343a, 1.3));
     const sun = new THREE.DirectionalLight(0xffe7c4, 2.6); // past quyosh — uzun soyalar
-    sun.position.set(23, 84, 92);
-    sun.target.position.set(95, 0, 8);
+    sun.position.set(23, 84, 112);
+    sun.target.position.set(95, 0, 28);
     scene.add(sun.target);
     sun.castShadow = true;
     sun.shadow.mapSize.set(4096, 4096);
@@ -1796,6 +1810,23 @@ export default function Gate3D({ lot = 1, event, arrival, reject, release, spots
     let cutLevel = null;
     let cutUntil = 0;
     const camTarget = new THREE.Vector3(13, 2.6, -9.5);
+    // Erkin kamera: chap tugma — aylantirish, o'ng — surish, g'ildirak — yaqinlashtirish, strelkalar (sahna tanlanganda) — surish.
+    // Foydalanuvchi tegsa avtomatik kamera to'xtaydi; 45 s tegmasa yoki "Avtomatik kamera" bosilsa qaytadi.
+    const controls = new OrbitControls(camera, renderer.domElement);
+    Object.assign(controls, { enableDamping: true, dampingFactor: 0.08, maxPolarAngle: Math.PI * 0.48, minDistance: 6, maxDistance: 320, keyPanSpeed: 30, screenSpacePanning: false });
+    renderer.domElement.tabIndex = 0;
+    controls.listenToKeyEvents(renderer.domElement);
+    let free = false;
+    let lastTouch = 0;
+    const takeOver = () => {
+      lastTouch = performance.now();
+      if (free) return;
+      free = true;
+      setFreeCam(true);
+    };
+    controls.addEventListener('start', takeOver);
+    controls.addEventListener('change', () => free && (lastTouch = performance.now()));
+    renderer.domElement.addEventListener('keydown', (e) => e.key.startsWith('Arrow') && takeOver());
     const camGoal = new THREE.Vector3();
     const seated = buildGuard(GUARD_SEATED);
     seated.position.copy(SEAT).setY(0.15);
@@ -2007,11 +2038,22 @@ export default function Gate3D({ lot = 1, event, arrival, reject, release, spots
         camGoal.copy(OVERVIEW[0]);
         offGoal.copy(OVERVIEW[1]).applyAxisAngle(Y_AXIS, Math.sin(time * 0.04) * 0.16);
       }
-      camTarget.lerp(camGoal, Math.min(1, dt * 1.1));
-      camOff.lerp(offGoal, Math.min(1, dt * 1.1));
-      camera.position.copy(camTarget).add(camOff);
-      camera.position.x += Math.sin(time * 0.15) * 0.4;
-      camera.lookAt(camTarget);
+      if (free && (autoCam.current || performance.now() - lastTouch > 45000)) {
+        free = false;
+        camTarget.copy(controls.target);
+        camOff.copy(camera.position).sub(controls.target);
+        setFreeCam(false);
+      }
+      autoCam.current = false;
+      if (free) controls.update();
+      else {
+        camTarget.lerp(camGoal, Math.min(1, dt * 1.1));
+        camOff.lerp(offGoal, Math.min(1, dt * 1.1));
+        camera.position.copy(camTarget).add(camOff);
+        camera.position.x += Math.sin(time * 0.15) * 0.4;
+        camera.lookAt(camTarget);
+        controls.target.copy(camTarget); // tegilgan zahoti kamera shu nuqta atrofida aylanadi
+      }
       const w = el.clientWidth;
       const h = el.clientHeight;
       renderer.setViewport(0, 0, w, h);
@@ -2073,6 +2115,7 @@ export default function Gate3D({ lot = 1, event, arrival, reject, release, spots
 
     return () => {
       renderer.setAnimationLoop(null);
+      controls.dispose();
       ro.disconnect();
       renderer.dispose();
       el.removeChild(renderer.domElement);
@@ -2135,6 +2178,11 @@ export default function Gate3D({ lot = 1, event, arrival, reject, release, spots
       <button type="button" className="gate-zoom" onClick={() => setBig((v) => !v)} aria-pressed={big}>
         {big ? 'Kichraytirish (Esc)' : 'Kattalashtirish'}
       </button>
+      {freeCam ? (
+        <button type="button" className="gate-free" onClick={() => { autoCam.current = true; }}>Avtomatik kamera</button>
+      ) : (
+        <span className="gate-free hint" aria-hidden="true">Erkin ko'rish: suring, g'ildirak — yaqinlashtirish, o'ng tugma — siljitish</span>
+      )}
       <div className="cam-box" ref={camBox} aria-hidden="true">
         <span className="cam-rec">KAMERA 1</span>
         <span className="cam-frame" />

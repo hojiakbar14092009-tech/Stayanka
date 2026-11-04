@@ -826,3 +826,12 @@ label { display: grid; gap: .3rem; font-size: .9rem; color: var(--paint-dim); }
 .counter.lot-tag { background: #3a3f47; }
 .lot-switch { align-self: center; }
 .lot-switch button { white-space: nowrap; }
+
+/* Erkin kamera: maslahat yoki "Avtomatik kamera" tugmasi (o'ng yuqori burchak) */
+.gate-free {
+  position: absolute; right: 8px; top: 8px; z-index: 3; border: 1px solid rgba(255, 255, 255, .5); border-radius: 6px;
+  background: rgba(20, 22, 26, .6); color: #fff; font: 600 .78rem var(--display); padding: .2rem .55rem; backdrop-filter: blur(4px);
+}
+.gate-free:hover { background: rgba(20, 22, 26, .85); }
+.gate-free.hint { pointer-events: none; font-weight: 500; opacity: .8; max-width: 58%; text-align: right; }
+.gate-canvas canvas:focus-visible { outline: 2px solid var(--paint); outline-offset: -2px; }
